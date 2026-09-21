@@ -576,8 +576,7 @@ fun HistoryScreen(
                         OrderHistoryCard(
                             order = order,
                             onShare = { shareOrderReceipt(context, order) },
-                            onEdit = { receiptPreviewOrder = order },
-                            onToggleServed = { viewModel.toggleOrderServed(order.id) }
+                            onEdit = { receiptPreviewOrder = order }
                         )
                     }
                 }
@@ -842,11 +841,11 @@ private fun FoodSalesBreakdownCard(
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
-                                            text = row.itemName,
+                                            text = row.displayLabel,
                                             fontSize = 14.sp,
                                             fontWeight = FontWeight.Medium,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            maxLines = 1,
+                                            maxLines = 2,
                                             overflow = TextOverflow.Ellipsis
                                         )
                                         Text(
@@ -927,7 +926,6 @@ fun OrderHistoryCard(
     order: Order,
     onShare: () -> Unit,
     onEdit: () -> Unit,
-    onToggleServed: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val density = LocalDensity.current
@@ -983,7 +981,6 @@ fun OrderHistoryCard(
         OrderHistoryCardContent(
             order = order,
             cardShape = cardShape,
-            onToggleServed = onToggleServed,
             modifier = Modifier
                 .fillMaxWidth()
                 .offset {
@@ -1046,7 +1043,6 @@ private fun OrderSwipeActionIcon(
 private fun OrderHistoryCardContent(
     order: Order,
     cardShape: RoundedCornerShape,
-    onToggleServed: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var isExpanded by remember(order.id) { mutableStateOf(false) }
@@ -1125,35 +1121,6 @@ private fun OrderHistoryCardContent(
                     }
                 }
                 Column(horizontalAlignment = Alignment.End) {
-                    val servedColor = if (order.isServed) {
-                        Color(0xFF2E7D32)
-                    } else {
-                        MaterialTheme.colorScheme.outline
-                    }
-                    val servedTextColor = if (order.isServed) {
-                        Color.White
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    }
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
-                            .border(1.dp, servedColor, RoundedCornerShape(4.dp))
-                            .background(
-                                if (order.isServed) servedColor else Color.Transparent,
-                                RoundedCornerShape(4.dp)
-                            )
-                            .clickable(onClick = onToggleServed)
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = if (order.isServed) "Served" else "Not Served",
-                            color = servedTextColor,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
                     val badgeColor = if (order.paymentMethod == "GCASH") {
                         MaterialTheme.colorScheme.tertiary
                     } else {

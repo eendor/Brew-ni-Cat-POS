@@ -32,6 +32,8 @@ data class CashierSalesResult(
 
 data class ItemSalesBreakdownResult(
     val itemName: String,
+    val variantName: String?,
+    val flavor: String?,
     val categoryName: String?,
     val totalQuantity: Int,
     val totalSales: Double
@@ -142,6 +144,8 @@ interface OrderDao {
     @Query(
         """
         SELECT oi.itemName AS itemName,
+               oi.variantName AS variantName,
+               oi.flavor AS flavor,
                c.name AS categoryName,
                SUM(oi.quantity) AS totalQuantity,
                SUM(oi.totalPrice) AS totalSales
@@ -150,7 +154,7 @@ interface OrderDao {
         LEFT JOIN items i ON oi.itemId = i.id
         LEFT JOIN categories c ON i.categoryId = c.id
         WHERE o.timestamp >= :startOfDay AND o.timestamp <= :endOfDay AND o.isVoided = 0
-        GROUP BY oi.itemName, c.name
+        GROUP BY oi.itemName, oi.variantName, oi.flavor, c.name
         ORDER BY totalSales DESC
         """
     )

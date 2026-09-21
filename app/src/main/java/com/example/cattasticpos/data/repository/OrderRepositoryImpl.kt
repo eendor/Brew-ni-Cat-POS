@@ -181,6 +181,8 @@ class OrderRepositoryImpl(
             rows.map { row ->
                 com.example.cattasticpos.domain.model.ItemSalesBreakdown(
                     itemName = row.itemName,
+                    variantName = row.variantName,
+                    flavor = row.flavor,
                     categoryName = row.categoryName,
                     totalQuantity = row.totalQuantity,
                     totalSales = row.totalSales

@@ -51,7 +51,23 @@ data class OrderItem(
  */
 data class ItemSalesBreakdown(
     val itemName: String,
+    val variantName: String?,
+    val flavor: String?,
     val categoryName: String?,
     val totalQuantity: Int,
     val totalSales: Double
-)
+) {
+    /** Specific product label, e.g. "Takoyaki (Pawsome Balls) · 4pcs · Shrimp Whisker". */
+    val displayLabel: String
+        get() {
+            val parts = mutableListOf(itemName)
+            if (!variantName.isNullOrBlank() && !variantName.equals(itemName, ignoreCase = true)) {
+                parts += variantName
+            }
+            if (!flavor.isNullOrBlank()) {
+                // Flavors are sometimes stored as "Group: Flavor"; show only the flavor.
+                parts += flavor.substringAfter(": ").trim()
+            }
+            return parts.joinToString(" · ")
+        }
+}

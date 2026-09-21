@@ -14,8 +14,6 @@ import {
   Edit2,
   Trash2,
   RefreshCw,
-  CheckCircle,
-  Clock,
   Sparkles,
   ShoppingBag,
   DollarSign,
@@ -553,17 +551,29 @@ function Dashboard() {
   const categoryNameById = (id: string) => categories.find(c => c.id === id)?.name || 'Other';
   const menuItemCategory = (itemId: string) => menuItems.find(m => m.id === itemId)?.category_id;
 
-  // Aggregate active (non-voided) order lines within the window, keyed by item name.
+  // A specific product label, e.g. "Takoyaki (Pawsome Balls) · 4pcs · Shrimp Whisker".
+  const itemDisplayLabel = (it: OrderItem) => {
+    const parts: string[] = [it.item_name];
+    if (it.variant_name && it.variant_name.toLowerCase() !== it.item_name.toLowerCase()) {
+      parts.push(it.variant_name);
+    }
+    if (it.flavor) parts.push(it.flavor.includes(': ') ? it.flavor.split(': ').pop()! : it.flavor);
+    return parts.join(' · ');
+  };
+
+  // Aggregate active (non-voided) order lines within the window, keyed by the specific
+  // item + variant + flavor combination so each distinct product carries its own total
+  // (not lumped by category).
   const foodBreakdown = (() => {
-    const map = new Map<string, { itemName: string; categoryName: string; quantity: number; sales: number }>();
+    const map = new Map<string, { label: string; categoryName: string; quantity: number; sales: number }>();
     orders.forEach(o => {
       if (o.is_voided) return;
       if (o.timestamp < breakdownRange.start || o.timestamp > breakdownRange.end) return;
       (o.order_items || []).forEach(it => {
-        const key = it.item_name;
+        const key = `${it.item_name}|${it.variant_name || ''}|${it.flavor || ''}`;
         const catId = menuItemCategory(it.item_id);
         const categoryName = catId ? categoryNameById(catId) : 'Other';
-        const prev = map.get(key) || { itemName: it.item_name, categoryName, quantity: 0, sales: 0 };
+        const prev = map.get(key) || { label: itemDisplayLabel(it), categoryName, quantity: 0, sales: 0 };
         prev.quantity += it.quantity;
         prev.sales += it.total_price;
         if (prev.categoryName === 'Other' && categoryName !== 'Other') prev.categoryName = categoryName;
@@ -601,7 +611,7 @@ function Dashboard() {
   const exportCSV = () => {
     const filtered = getFilteredOrders();
     let csvContent = 'data:text/csv;charset=utf-8,';
-    csvContent += 'Order ID,Receipt Number,Device ID,Timestamp,Date,Subtotal,Discount Deduction,Discount Label,Total,Payment Method,Payment Reference,Cashier,Name,Served\n';
+    csvContent += 'Order ID,Receipt Number,Device ID,Timestamp,Date,Subtotal,Discount Deduction,Discount Label,Total,Payment Method,Payment Reference,Cashier,Name\n';
 
     filtered.forEach(o => {
       const displayId = o.id >= 1000000000 ? o.id % 1000000000 : o.id;
@@ -620,8 +630,7 @@ function Dashboard() {
         o.payment_method,
         `"${o.payment_reference || ''}"`,
         `"${o.cashier_name || ''}"`,
-        `"${o.table_label || ''}"`,
-        o.is_served ? 'TRUE' : 'FALSE'
+        `"${o.table_label || ''}"`
       ].join(',');
       csvContent += row + '\n';
     });
@@ -633,20 +642,6 @@ function Dashboard() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  };
-
-  // Serve live order toggle
-  const toggleOrderServed = async (orderId: number, currentStatus: boolean) => {
-    try {
-      const { error } = await supabase
-        .from('orders')
-        .update({ is_served: !currentStatus })
-        .eq('id', orderId);
-      if (error) throw error;
-      fetchOrdersOnly();
-    } catch (e) {
-      console.error(e);
-    }
   };
 
   // The order's line items as currently being edited (working copy), or its saved items.
@@ -1211,7 +1206,7 @@ function Dashboard() {
                   {/* Left Column: Live Kitchen Queue */}
                   <div className="lg:col-span-2 bg-surface border border-hair rounded-3xl p-6 flex flex-col gap-5 backdrop-blur-xl shadow-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.03)]">
                     <div className="flex justify-between items-center">
-                      <h3 className="text-sm font-black uppercase tracking-wider text-txt-2">Live Kitchen Queue</h3>
+                      <h3 className="text-sm font-black uppercase tracking-wider text-txt-2">Recent Orders</h3>
                       <span className="text-xs text-txt-2 font-bold">Latest 10 orders</span>
                     </div>
 
@@ -1238,26 +1233,7 @@ function Dashboard() {
                               </span>
                             </div>
 
-                            <button
-                              onClick={() => toggleOrderServed(order.id, order.is_served)}
-                              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all border ${
-                                order.is_served
-                                  ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.05)]'
-                                  : 'bg-amber-500/10 border-amber-500/20 text-amber-400 hover:bg-amber-500/20 shadow-[0_0_10px_rgba(245,158,11,0.05)]'
-                              }`}
-                            >
-                              {order.is_served ? (
-                                <>
-                                  <CheckCircle className="w-3.5 h-3.5" />
-                                  Served
-                                </>
-                              ) : (
-                                <>
-                                  <Clock className="w-3.5 h-3.5 animate-pulse" />
-                                  Preparing
-                                </>
-                              )}
-                            </button>
+                            <span className="text-sm font-black text-txt-1 whitespace-nowrap">{formatPrice(order.total)}</span>
                           </div>
                         );
                       })}
@@ -1441,9 +1417,9 @@ function Dashboard() {
                           </div>
                           <div className="flex flex-col gap-1.5">
                             {group.rows.map(row => (
-                              <div key={row.itemName} className="flex justify-between items-center bg-surface-2 border border-hair rounded-xl px-3.5 py-2.5">
+                              <div key={row.label} className="flex justify-between items-center bg-surface-2 border border-hair rounded-xl px-3.5 py-2.5">
                                 <div className="flex flex-col min-w-0">
-                                  <span className="text-sm font-semibold text-txt-1 truncate">{row.itemName}</span>
+                                  <span className="text-sm font-semibold text-txt-1 truncate">{row.label}</span>
                                   <span className="text-[10px] text-txt-3 font-semibold">{row.quantity} sold</span>
                                 </div>
                                 <span className="text-sm font-bold text-txt-1 whitespace-nowrap ml-2">{formatPrice(row.sales)}</span>
@@ -1568,21 +1544,6 @@ function Dashboard() {
                                 <User className="w-3.5 h-3.5 text-txt-2" /> {o.cashier_name || 'Popot'}
                               </span>
                               <span className={`text-sm font-black ${o.is_voided ? 'text-txt-3 line-through' : 'text-txt-1'}`}>{formatPrice(o.total)}</span>
-                              
-                              {/* Status Indicator Served/Preparing */}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleOrderServed(o.id, o.is_served);
-                                }}
-                                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all border ${
-                                  o.is_served
-                                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20'
-                                    : 'bg-amber-500/10 border-amber-500/20 text-amber-400 hover:bg-amber-500/20'
-                                }`}
-                              >
-                                {o.is_served ? 'Served' : 'Preparing'}
-                              </button>
 
                               <div>
                                 {isExpanded ? <ChevronUp className="w-4 h-4 text-txt-2" /> : <ChevronDown className="w-4 h-4 text-txt-2" />}

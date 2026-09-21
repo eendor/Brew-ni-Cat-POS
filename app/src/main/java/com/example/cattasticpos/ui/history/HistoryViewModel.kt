@@ -490,15 +490,6 @@ class HistoryViewModel(
         }
     }
 
-    fun toggleOrderServed(orderId: Long) {
-        viewModelScope.launch {
-            val order = orderRepository.getOrderById(orderId) ?: return@launch
-            orderRepository.setOrderServed(orderId, !order.isServed)
-            // The row is PENDING now; push it before the next catch-up download runs.
-            com.example.cattasticpos.worker.SyncWorker.triggerImmediateSync(application)
-        }
-    }
-
     fun updateOrder(orderId: Long, cartItems: List<CartItem>, discountStrategy: DiscountStrategy) {
         viewModelScope.launch {
             val result = updateOrderUseCase(orderId, cartItems, discountStrategy)
