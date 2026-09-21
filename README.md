@@ -275,7 +275,6 @@ An honest list, so nobody rediscovers these the hard way:
 - Room migrations only chain from schema **v6** upward, with no destructive fallback — a pre-v6 database fails to open and lands in `CrashActivity`.
 - Bluetooth printing cannot be covered by automated tests.
 - 95 lint warnings remain (mostly `DefaultLocale` on `%.0f`, harmless in en/PHP locales). 0 errors, which is enforced.
-- `IMPLEMENTATION_SUMMARY.md`, `MULTIDEVICE_SYNC_GUIDE.md`, `QUICK_REFERENCE.md` and `SYNC_IMPLEMENTATION_COMPLETE.md` document the June 2026 sync work and are **partly out of date** — they predate authentication, the `remoteId` scheme and the current release pipeline. `RELEASE_INSTRUCTIONS.md` is current. Treat this README as authoritative where they disagree.
 
 ---
 
