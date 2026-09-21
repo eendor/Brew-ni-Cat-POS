@@ -222,6 +222,15 @@ function Dashboard() {
 
   // Filter States
   const [filterDate, setFilterDate] = useState<string>(''); // YYYY-MM-DD
+  // Which day's End-of-Day (Z-Reading) report to show on the dashboard. Defaults to today, but
+  // the owner counts the drawer the next morning, so they can scroll back to any past day here —
+  // the online POS kept no per-day report before this.
+  const [reportDate, setReportDate] = useState<string>(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
+  // Per-food breakdown window: 'week' (Mon-start) or 'month' (1st of month).
+  const [breakdownPeriod, setBreakdownPeriod] = useState<'week' | 'month'>('week');
   const [filterDeviceId, setFilterDeviceId] = useState<string>('all');
   const [filterPayment, setFilterPayment] = useState<string>('all');
   const [expandedOrders, setExpandedOrders] = useState<Record<number, boolean>>({});
@@ -483,16 +492,89 @@ function Dashboard() {
     return { grossSales, discounts, netSales, cashSales, gcashSales, count };
   };
   const todayKey = localDateKey(Date.now());
-  const todayStats = computeStats(orders.filter(o => localDateKey(o.timestamp) === todayKey));
+  // The End-of-Day report follows the picked reportDate (defaults to today) so the owner can pull
+  // up a previous day's takings the morning after — matching the tablet's Z-Reading, which they
+  // couldn't see online before.
+  const reportOrders = orders.filter(o => localDateKey(o.timestamp) === reportDate);
+  const todayStats = computeStats(reportOrders);
   const allTimeStats = computeStats(orders);
   const STARTING_FLOAT = 1500.0;
+  const isReportToday = reportDate === todayKey;
+  const reportDateLabel = (() => {
+    const [y, m, d] = reportDate.split('-').map(Number);
+    return new Date(y, (m || 1) - 1, d || 1).toLocaleDateString(undefined, {
+      weekday: 'short', year: 'numeric', month: 'short', day: 'numeric'
+    });
+  })();
 
-  // Operating expenses recorded on the cashier terminals, scoped to today (local date).
+  // Operating expenses recorded on the cashier terminals, scoped to the report date (local).
   // Treated as cash drawer outflows: they reduce the estimated drawer balance and net profit.
   const todayExpenseList = expenses
-    .filter(e => localDateKey(e.timestamp) === todayKey)
+    .filter(e => localDateKey(e.timestamp) === reportDate)
     .sort((a, b) => b.timestamp - a.timestamp);
   const todayExpenses = todayExpenseList.reduce((sum, e) => sum + e.amount, 0);
+
+  // --- Per-food sales breakdown (mirrors the Android app's Food & Drink Totals) ---
+  // Each food/drink is totaled on its own, grouped by category, for the selected week or month —
+  // separate from the shop-wide takings so the owner can see per-item profitability.
+  const breakdownRange = (() => {
+    const now = new Date();
+    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime();
+    let start: number;
+    if (breakdownPeriod === 'week') {
+      const day = now.getDay(); // 0=Sun..6=Sat
+      const diffToMonday = (day + 6) % 7; // days since Monday
+      const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diffToMonday, 0, 0, 0, 0);
+      start = monday.getTime();
+    } else {
+      start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0).getTime();
+    }
+    return { start, end };
+  })();
+
+  const categoryNameById = (id: string) => categories.find(c => c.id === id)?.name || 'Other';
+  const menuItemCategory = (itemId: string) => menuItems.find(m => m.id === itemId)?.category_id;
+
+  // Aggregate active (non-voided) order lines within the window, keyed by item name.
+  const foodBreakdown = (() => {
+    const map = new Map<string, { itemName: string; categoryName: string; quantity: number; sales: number }>();
+    orders.forEach(o => {
+      if (o.is_voided) return;
+      if (o.timestamp < breakdownRange.start || o.timestamp > breakdownRange.end) return;
+      (o.order_items || []).forEach(it => {
+        const key = it.item_name;
+        const catId = menuItemCategory(it.item_id);
+        const categoryName = catId ? categoryNameById(catId) : 'Other';
+        const prev = map.get(key) || { itemName: it.item_name, categoryName, quantity: 0, sales: 0 };
+        prev.quantity += it.quantity;
+        prev.sales += it.total_price;
+        if (prev.categoryName === 'Other' && categoryName !== 'Other') prev.categoryName = categoryName;
+        map.set(key, prev);
+      });
+    });
+    return Array.from(map.values());
+  })();
+
+  const foodBreakdownGrouped = (() => {
+    const byCat = new Map<string, typeof foodBreakdown>();
+    foodBreakdown.forEach(row => {
+      const arr = byCat.get(row.categoryName) || [];
+      arr.push(row);
+      byCat.set(row.categoryName, arr);
+    });
+    return Array.from(byCat.entries())
+      .map(([categoryName, rows]) => ({
+        categoryName,
+        rows: rows.sort((a, b) => b.sales - a.sales),
+        total: rows.reduce((s, r) => s + r.sales, 0)
+      }))
+      .sort((a, b) => b.total - a.total);
+  })();
+  const foodBreakdownTotal = foodBreakdown.reduce((s, r) => s + r.sales, 0);
+  const breakdownRangeLabel = (() => {
+    const fmt = (t: number) => new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    return `${fmt(breakdownRange.start)} – ${fmt(breakdownRange.end)}`;
+  })();
   // All-time expense aggregates for the dedicated Expense Log tab.
   const allExpensesTotal = expenses.reduce((sum, e) => sum + e.amount, 0);
   const uniqueRecorders = new Set(expenses.map(e => e.recorded_by).filter(Boolean)).size;
@@ -1135,8 +1217,8 @@ function Dashboard() {
                   {/* Right Column: Financial Integrity Z-Reading (App Clone Layout) */}
                   <div className="bg-[#0c0c0e]/60 border border-white/5 rounded-3xl p-6 flex flex-col gap-6 backdrop-blur-xl shadow-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.03)] justify-between">
                     <div>
-                      <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-sm font-black uppercase tracking-wider text-slate-300">Z-Reading Report</h3>
+                      <div className="flex justify-between items-center mb-2">
+                        <h3 className="text-sm font-black uppercase tracking-wider text-slate-300">End of Day Report</h3>
                         <div className="flex gap-2">
                           <button
                             onClick={handlePrintZReading}
@@ -1148,17 +1230,55 @@ function Dashboard() {
                         </div>
                       </div>
 
+                      {/* Report day picker — the owner counts the drawer the next morning, so they
+                          can pull up any past day's takings here. */}
+                      <div className="flex items-center justify-between gap-2 mb-4 bg-white/[0.03] border border-white/10 rounded-xl px-3 py-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Calendar className="w-4 h-4 text-emerald-400 shrink-0" />
+                          <span className="text-xs font-bold text-slate-300 truncate">
+                            {isReportToday ? 'Today' : reportDateLabel}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="date"
+                            value={reportDate}
+                            max={todayKey}
+                            onChange={e => setReportDate(e.target.value || todayKey)}
+                            className="bg-white/[0.03] border border-white/10 px-2 py-1 rounded-lg text-[11px] text-slate-200 outline-none focus:border-emerald-500/50 transition-all font-semibold"
+                          />
+                          {!isReportToday && (
+                            <button
+                              onClick={() => setReportDate(todayKey)}
+                              className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 px-2 py-1 rounded-lg border border-emerald-500/20 hover:bg-emerald-500/10 transition-all whitespace-nowrap"
+                            >
+                              Today
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
                       <div className="flex flex-col gap-4">
                         <div className="flex justify-between items-center border-b border-white/5 pb-3.5 text-sm">
                           <span className="text-slate-400 font-semibold">Total Sales (Gross)</span>
                           <span className="text-right">
                             <span className="font-bold text-slate-200 block">{formatPrice(todayStats.grossSales)}</span>
-                            <span className="text-[10px] text-slate-500 font-semibold">today &bull; all-time {formatPrice(allTimeStats.grossSales)}</span>
+                            <span className="text-[10px] text-slate-500 font-semibold">{isReportToday ? 'today' : reportDateLabel} &bull; all-time {formatPrice(allTimeStats.grossSales)}</span>
                           </span>
                         </div>
                         <div className="flex justify-between border-b border-white/5 pb-3.5 text-sm">
-                          <span className="text-slate-400 font-semibold">Discounts Given (Today)</span>
+                          <span className="text-slate-400 font-semibold">Discounts Given</span>
                           <span className="font-bold text-red-400">-{formatPrice(todayStats.discounts)}</span>
+                        </div>
+
+                        {/* Net Revenue + Profits — the headline the owner counts against the drawer */}
+                        <div className="flex justify-between items-center border-b border-white/5 pb-3.5 text-sm">
+                          <span className="text-slate-400 font-semibold">Net Revenue</span>
+                          <span className="font-bold text-slate-200">{formatPrice(todayStats.netSales)}</span>
+                        </div>
+                        <div className="flex justify-between items-center border-b border-white/5 pb-3.5">
+                          <span className="text-slate-200 font-bold text-sm">Profits (Net Cash Flow)</span>
+                          <span className="font-black text-emerald-400 text-lg">{formatPrice(todayStats.netSales - todayExpenses)}</span>
                         </div>
                         
                         {/* Goal Progress bar clone */}
@@ -1192,7 +1312,7 @@ function Dashboard() {
                               ))}
                             </div>
                           ) : (
-                            <span className="text-[11px] text-slate-600 pl-1">No expenses recorded today.</span>
+                            <span className="text-[11px] text-slate-600 pl-1">No expenses recorded {isReportToday ? 'today' : 'this day'}.</span>
                           )}
                         </div>
 
@@ -1203,7 +1323,7 @@ function Dashboard() {
                             <span className="font-black text-emerald-400 text-base">{formatPrice(todayStats.cashSales + STARTING_FLOAT - todayExpenses)}</span>
                           </div>
                           <div className="flex justify-between text-[10px] text-slate-500 font-semibold">
-                            <span>(Float: {formatPrice(STARTING_FLOAT)} + Today&apos;s Cash: {formatPrice(todayStats.cashSales)} &minus; Expenses: {formatPrice(todayExpenses)})</span>
+                            <span>(Float: {formatPrice(STARTING_FLOAT)} + Cash: {formatPrice(todayStats.cashSales)} &minus; Expenses: {formatPrice(todayExpenses)})</span>
                           </div>
                         </div>
 
@@ -1223,9 +1343,71 @@ function Dashboard() {
                     </div>
 
                     <span className="text-[10px] text-slate-500 leading-relaxed font-semibold mt-4">
-                      Note: Figures above are for today. Expenses are aggregated from cashier terminal cash drawer entries. Estimates assume a ₱1,500 starting cash float.
+                      Note: Figures above are for {isReportToday ? 'today' : reportDateLabel}. Expenses are aggregated from cashier terminal cash drawer entries. Estimates assume a ₱1,500 starting cash float.
                     </span>
                   </div>
+                </div>
+
+                {/* Food & Drink Totals — per-item running totals, separate from shop takings */}
+                <div className="bg-[#0c0c0e]/60 border border-white/5 rounded-3xl p-6 backdrop-blur-xl shadow-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.03)] flex flex-col gap-5">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex flex-col">
+                      <h3 className="text-sm font-black uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                        <Utensils className="w-4 h-4 text-emerald-400" /> Food &amp; Drink Totals
+                      </h3>
+                      <span className="text-[11px] text-slate-500 font-semibold mt-0.5">
+                        Per item · {breakdownPeriod === 'week' ? 'This Week' : 'This Month'} ({breakdownRangeLabel})
+                      </span>
+                    </div>
+                    {/* Week / Month toggle */}
+                    <div className="flex items-center gap-1 bg-white/[0.03] border border-white/10 rounded-xl p-1">
+                      {(['week', 'month'] as const).map(p => (
+                        <button
+                          key={p}
+                          onClick={() => setBreakdownPeriod(p)}
+                          className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                            breakdownPeriod === p
+                              ? 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-300'
+                              : 'text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          {p === 'week' ? 'Per Week' : 'Per Month'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {foodBreakdown.length === 0 ? (
+                    <span className="text-xs text-slate-600 font-semibold py-4 text-center">
+                      No sales recorded for this {breakdownPeriod === 'week' ? 'week' : 'month'} yet.
+                    </span>
+                  ) : (
+                    <div className="flex flex-col gap-5">
+                      {foodBreakdownGrouped.map(group => (
+                        <div key={group.categoryName} className="flex flex-col gap-2">
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs font-black uppercase tracking-wider text-emerald-400">{group.categoryName}</span>
+                            <span className="text-xs font-black text-emerald-400">{formatPrice(group.total)}</span>
+                          </div>
+                          <div className="flex flex-col gap-1.5">
+                            {group.rows.map(row => (
+                              <div key={row.itemName} className="flex justify-between items-center bg-white/[0.02] border border-white/5 rounded-xl px-3.5 py-2.5">
+                                <div className="flex flex-col min-w-0">
+                                  <span className="text-sm font-semibold text-slate-200 truncate">{row.itemName}</span>
+                                  <span className="text-[10px] text-slate-500 font-semibold">{row.quantity} sold</span>
+                                </div>
+                                <span className="text-sm font-bold text-slate-100 whitespace-nowrap ml-2">{formatPrice(row.sales)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                      <div className="flex justify-between items-center border-t border-white/10 pt-4 mt-1">
+                        <span className="text-sm font-black text-slate-200">All Food &amp; Drinks</span>
+                        <span className="text-xl font-black text-emerald-400">{formatPrice(foodBreakdownTotal)}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </>
             )}
