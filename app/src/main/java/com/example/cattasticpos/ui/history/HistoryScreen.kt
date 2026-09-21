@@ -99,6 +99,7 @@ fun HistoryScreen(
     val itemSalesBreakdown by viewModel.itemSalesBreakdownState.collectAsStateWithLifecycle()
     val breakdownPeriod by viewModel.breakdownPeriod.collectAsStateWithLifecycle()
     val breakdownRange by viewModel.breakdownRangeState.collectAsStateWithLifecycle()
+    val breakdownDay by viewModel.breakdownDayMillis.collectAsStateWithLifecycle()
     val showDateRangeDialog by viewModel.showDateRangeDialog.collectAsStateWithLifecycle()
     val canLoadMore by viewModel.canLoadMore.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -501,6 +502,8 @@ fun HistoryScreen(
                         period = breakdownPeriod,
                         rangeStart = breakdownRange.first,
                         rangeEnd = breakdownRange.second,
+                        dayMillis = breakdownDay,
+                        onStepDay = { viewModel.stepBreakdownDay(it) },
                         onPeriodChange = { viewModel.setBreakdownPeriod(it) }
                     )
                 }
@@ -719,14 +722,31 @@ private fun FoodSalesBreakdownCard(
     period: BreakdownPeriod,
     rangeStart: Long,
     rangeEnd: Long,
+    dayMillis: Long,
     onPeriodChange: (BreakdownPeriod) -> Unit,
+    onStepDay: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(true) }
     val grandTotal = remember(breakdown) { breakdown.sumOf { it.totalSales } }
-    val rangeLabel = remember(rangeStart, rangeEnd) {
-        val fmt = SimpleDateFormat("MMM d", Locale.getDefault())
-        "${fmt.format(Date(rangeStart))} – ${fmt.format(Date(rangeEnd))}"
+    val periodWord = when (period) {
+        BreakdownPeriod.DAY -> "day"
+        BreakdownPeriod.WEEK -> "week"
+        BreakdownPeriod.MONTH -> "month"
+    }
+    val rangeLabel = remember(rangeStart, rangeEnd, period) {
+        if (period == BreakdownPeriod.DAY) {
+            SimpleDateFormat("EEE, MMM d, yyyy", Locale.getDefault()).format(Date(rangeStart))
+        } else {
+            val fmt = SimpleDateFormat("MMM d", Locale.getDefault())
+            "${fmt.format(Date(rangeStart))} – ${fmt.format(Date(rangeEnd))}"
+        }
+    }
+    val isToday = remember(dayMillis) {
+        val a = Calendar.getInstance().apply { timeInMillis = dayMillis }
+        val b = Calendar.getInstance()
+        a.get(Calendar.YEAR) == b.get(Calendar.YEAR) &&
+            a.get(Calendar.DAY_OF_YEAR) == b.get(Calendar.DAY_OF_YEAR)
     }
     // Group by category so foods and drinks read as separate sections, each food its own total.
     val grouped = remember(breakdown) {
@@ -753,8 +773,13 @@ private fun FoodSalesBreakdownCard(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    val periodTitle = when (period) {
+                        BreakdownPeriod.DAY -> if (isToday) "Today" else "Selected Day"
+                        BreakdownPeriod.WEEK -> "This Week"
+                        BreakdownPeriod.MONTH -> "This Month"
+                    }
                     Text(
-                        text = "Per item · ${if (period == BreakdownPeriod.WEEK) "This Week" else "This Month"} ($rangeLabel)",
+                        text = "Per item · $periodTitle ($rangeLabel)",
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                     )
@@ -795,7 +820,11 @@ private fun FoodSalesBreakdownCard(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = if (p == BreakdownPeriod.WEEK) "Per Week" else "Per Month",
+                                    text = when (p) {
+                                        BreakdownPeriod.DAY -> "Per Day"
+                                        BreakdownPeriod.WEEK -> "Per Week"
+                                        BreakdownPeriod.MONTH -> "Per Month"
+                                    },
                                     fontSize = 13.sp,
                                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
                                     color = if (selected) MaterialTheme.colorScheme.onSecondary
@@ -805,9 +834,49 @@ private fun FoodSalesBreakdownCard(
                         }
                     }
 
+                    // Day stepper — only shown in Per Day mode so the owner can move between days.
+                    if (period == BreakdownPeriod.DAY) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+                                .padding(horizontal = 4.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            IconButton(onClick = { onStepDay(-1) }) {
+                                FluentIcon(
+                                    imageVector = FluentIcons.ChevronLeft,
+                                    contentDescription = "Previous day",
+                                    tint = MaterialTheme.colorScheme.secondary,
+                                    size = 20.dp
+                                )
+                            }
+                            Text(
+                                text = rangeLabel,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            IconButton(
+                                onClick = { onStepDay(1) },
+                                enabled = !isToday
+                            ) {
+                                FluentIcon(
+                                    imageVector = FluentIcons.ChevronRight,
+                                    contentDescription = "Next day",
+                                    tint = if (isToday) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                                    else MaterialTheme.colorScheme.secondary,
+                                    size = 20.dp
+                                )
+                            }
+                        }
+                    }
+
                     if (breakdown.isEmpty()) {
                         Text(
-                            text = "No sales recorded for this ${if (period == BreakdownPeriod.WEEK) "week" else "month"} yet.",
+                            text = "No sales recorded for this $periodWord yet.",
                             fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                             modifier = Modifier.padding(vertical = 8.dp)

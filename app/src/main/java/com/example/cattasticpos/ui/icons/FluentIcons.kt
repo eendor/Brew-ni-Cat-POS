@@ -12,6 +12,8 @@ import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Calendar
 import com.composables.icons.lucide.ChevronDown
+import com.composables.icons.lucide.ChevronLeft
+import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.ChevronUp
 import com.composables.icons.lucide.CircleCheck
 import com.composables.icons.lucide.CircleDot
@@ -70,6 +72,8 @@ object FluentIcons {
     val Delete: ImageVector = Lucide.Trash2
     val ChevronUp: ImageVector = Lucide.ChevronUp
     val ChevronDown: ImageVector = Lucide.ChevronDown
+    val ChevronLeft: ImageVector = Lucide.ChevronLeft
+    val ChevronRight: ImageVector = Lucide.ChevronRight
     val Receipt: ImageVector = Lucide.ReceiptText
     val Trophy: ImageVector = Lucide.Trophy
     val Add: ImageVector = Lucide.Plus

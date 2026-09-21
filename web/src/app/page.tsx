@@ -230,7 +230,12 @@ function Dashboard() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   });
   // Per-food breakdown window: 'week' (Mon-start) or 'month' (1st of month).
-  const [breakdownPeriod, setBreakdownPeriod] = useState<'week' | 'month'>('week');
+  const [breakdownPeriod, setBreakdownPeriod] = useState<'day' | 'week' | 'month'>('day');
+  // For the Per Day view — which day is shown (YYYY-MM-DD). Defaults to today.
+  const [breakdownDay, setBreakdownDay] = useState<string>(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
   const [filterDeviceId, setFilterDeviceId] = useState<string>('all');
   const [filterPayment, setFilterPayment] = useState<string>('all');
   const [expandedOrders, setExpandedOrders] = useState<Record<number, boolean>>({});
@@ -535,6 +540,13 @@ function Dashboard() {
   // separate from the shop-wide takings so the owner can see per-item profitability.
   const breakdownRange = (() => {
     const now = new Date();
+    if (breakdownPeriod === 'day') {
+      // Bound to the picked day, start to end.
+      const [y, m, d] = breakdownDay.split('-').map(Number);
+      const start = new Date(y, (m || 1) - 1, d || 1, 0, 0, 0, 0).getTime();
+      const end = new Date(y, (m || 1) - 1, d || 1, 23, 59, 59, 999).getTime();
+      return { start, end };
+    }
     const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime();
     let start: number;
     if (breakdownPeriod === 'week') {
@@ -600,8 +612,28 @@ function Dashboard() {
   })();
   const foodBreakdownTotal = foodBreakdown.reduce((s, r) => s + r.sales, 0);
   const breakdownRangeLabel = (() => {
+    if (breakdownPeriod === 'day') {
+      return new Date(breakdownRange.start).toLocaleDateString(undefined, {
+        weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
+      });
+    }
     const fmt = (t: number) => new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
     return `${fmt(breakdownRange.start)} – ${fmt(breakdownRange.end)}`;
+  })();
+  const breakdownIsToday = (() => {
+    const d = new Date();
+    return breakdownDay === `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  })();
+  const stepBreakdownDay = (deltaDays: number) => {
+    const [y, m, d] = breakdownDay.split('-').map(Number);
+    const dt = new Date(y, (m || 1) - 1, d || 1);
+    dt.setDate(dt.getDate() + deltaDays);
+    if (deltaDays > 0 && dt.getTime() > Date.now()) return; // never into the future
+    setBreakdownDay(`${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`);
+  };
+  const todayKeyForBreakdown = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   })();
   // All-time expense aggregates for the dedicated Expense Log tab.
   const allExpensesTotal = expenses.reduce((sum, e) => sum + e.amount, 0);
@@ -1382,12 +1414,12 @@ function Dashboard() {
                         <Utensils className="w-4 h-4 text-emerald-400" /> Food &amp; Drink Totals
                       </h3>
                       <span className="text-[11px] text-txt-3 font-semibold mt-0.5">
-                        Per item · {breakdownPeriod === 'week' ? 'This Week' : 'This Month'} ({breakdownRangeLabel})
+                        Per item · {breakdownPeriod === 'day' ? (breakdownIsToday ? 'Today' : 'Selected Day') : breakdownPeriod === 'week' ? 'This Week' : 'This Month'} ({breakdownRangeLabel})
                       </span>
                     </div>
-                    {/* Week / Month toggle */}
+                    {/* Day / Week / Month toggle */}
                     <div className="flex items-center gap-1 bg-surface-2 border border-hair rounded-xl p-1">
-                      {(['week', 'month'] as const).map(p => (
+                      {(['day', 'week', 'month'] as const).map(p => (
                         <button
                           key={p}
                           onClick={() => setBreakdownPeriod(p)}
@@ -1397,15 +1429,43 @@ function Dashboard() {
                               : 'text-txt-2 hover:text-txt-1'
                           }`}
                         >
-                          {p === 'week' ? 'Per Week' : 'Per Month'}
+                          {p === 'day' ? 'Per Day' : p === 'week' ? 'Per Week' : 'Per Month'}
                         </button>
                       ))}
                     </div>
                   </div>
 
+                  {/* Day stepper — only in Per Day mode so the owner can move between days */}
+                  {breakdownPeriod === 'day' && (
+                    <div className="flex items-center justify-between gap-2 bg-surface-2 border border-hair rounded-xl px-2 py-1.5">
+                      <button
+                        onClick={() => stepBreakdownDay(-1)}
+                        className="p-1.5 rounded-lg text-emerald-400 hover:bg-surface-3 transition-all"
+                        title="Previous day"
+                      >
+                        <ChevronRight className="w-4 h-4 rotate-180" />
+                      </button>
+                      <input
+                        type="date"
+                        value={breakdownDay}
+                        max={todayKeyForBreakdown}
+                        onChange={e => e.target.value && setBreakdownDay(e.target.value)}
+                        className="bg-transparent text-xs text-txt-1 font-bold outline-none text-center"
+                      />
+                      <button
+                        onClick={() => stepBreakdownDay(1)}
+                        disabled={breakdownIsToday}
+                        className={`p-1.5 rounded-lg transition-all ${breakdownIsToday ? 'text-txt-4 cursor-not-allowed' : 'text-emerald-400 hover:bg-surface-3'}`}
+                        title="Next day"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+
                   {foodBreakdown.length === 0 ? (
                     <span className="text-xs text-txt-4 font-semibold py-4 text-center">
-                      No sales recorded for this {breakdownPeriod === 'week' ? 'week' : 'month'} yet.
+                      No sales recorded for this {breakdownPeriod === 'day' ? 'day' : breakdownPeriod === 'week' ? 'week' : 'month'} yet.
                     </span>
                   ) : (
                     <div className="flex flex-col gap-5">

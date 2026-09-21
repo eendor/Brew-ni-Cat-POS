@@ -35,7 +35,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.Calendar
 
-enum class BreakdownPeriod { WEEK, MONTH }
+enum class BreakdownPeriod { DAY, WEEK, MONTH }
 
 data class DateRangeApplyResult(
     val startMillis: Long,
@@ -333,15 +333,36 @@ class HistoryViewModel(
     // The owner wants each food/drink totaled on its own, viewable per week and per month.
     // This is deliberately independent of the date-range filter above so it never touches
     // the existing history behaviour.
-    private val _breakdownPeriod = MutableStateFlow(BreakdownPeriod.WEEK)
+    private val _breakdownPeriod = MutableStateFlow(BreakdownPeriod.DAY)
     val breakdownPeriod: StateFlow<BreakdownPeriod> = _breakdownPeriod.asStateFlow()
 
+    // For the Per Day view: which day is being shown. Null means today. Used so the owner can
+    // step back to any past day's per-food totals.
+    private val _breakdownDayMillis = MutableStateFlow(System.currentTimeMillis())
+    val breakdownDayMillis: StateFlow<Long> = _breakdownDayMillis.asStateFlow()
+
     fun setBreakdownPeriod(period: BreakdownPeriod) {
+        if (period == BreakdownPeriod.DAY) {
+            // Re-anchor to today each time Day is (re)selected so it opens on the current day.
+            _breakdownDayMillis.value = System.currentTimeMillis()
+        }
         _breakdownPeriod.value = period
     }
 
-    private fun breakdownRangeFor(period: BreakdownPeriod): Pair<Long, Long> {
-        val calendar = Calendar.getInstance()
+    fun setBreakdownDay(dayMillis: Long) {
+        _breakdownDayMillis.value = dayMillis
+    }
+
+    fun stepBreakdownDay(deltaDays: Int) {
+        val calendar = Calendar.getInstance().apply { timeInMillis = _breakdownDayMillis.value }
+        calendar.add(Calendar.DAY_OF_MONTH, deltaDays)
+        // Never step into the future.
+        if (calendar.timeInMillis > System.currentTimeMillis() && deltaDays > 0) return
+        _breakdownDayMillis.value = calendar.timeInMillis
+    }
+
+    private fun breakdownRangeFor(period: BreakdownPeriod, dayMillis: Long): Pair<Long, Long> {
+        val calendar = Calendar.getInstance().apply { timeInMillis = dayMillis }
         calendar.set(Calendar.HOUR_OF_DAY, 23)
         calendar.set(Calendar.MINUTE, 59)
         calendar.set(Calendar.SECOND, 59)
@@ -353,6 +374,10 @@ class HistoryViewModel(
         calendar.set(Calendar.SECOND, 0)
         calendar.set(Calendar.MILLISECOND, 0)
         when (period) {
+            BreakdownPeriod.DAY -> {
+                // start/end already bound to the selected day.
+                return calendar.timeInMillis to end
+            }
             BreakdownPeriod.WEEK -> {
                 calendar.firstDayOfWeek = Calendar.MONDAY
                 calendar.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
@@ -361,22 +386,25 @@ class HistoryViewModel(
                 calendar.set(Calendar.DAY_OF_MONTH, 1)
             }
         }
-        val start = calendar.timeInMillis
-        return start to end
+        // For WEEK/MONTH the end is "now" (end of today), not end of the anchor day.
+        val nowEnd = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 23); set(Calendar.MINUTE, 59)
+            set(Calendar.SECOND, 59); set(Calendar.MILLISECOND, 999)
+        }.timeInMillis
+        return calendar.timeInMillis to nowEnd
     }
 
     /** Start/end epoch millis of the currently selected breakdown window, for the range label. */
     val breakdownRangeState: StateFlow<Pair<Long, Long>> =
-        _breakdownPeriod
-            .map { breakdownRangeFor(it) }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), breakdownRangeFor(BreakdownPeriod.WEEK))
+        combine(_breakdownPeriod, _breakdownDayMillis) { period, day -> breakdownRangeFor(period, day) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), breakdownRangeFor(BreakdownPeriod.DAY, System.currentTimeMillis()))
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val itemSalesBreakdownState: StateFlow<List<com.example.cattasticpos.domain.model.ItemSalesBreakdown>> =
-        _breakdownPeriod.flatMapLatest { period ->
-            val (start, end) = breakdownRangeFor(period)
-            orderRepository.getItemSalesBreakdownForRange(start, end)
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        combine(_breakdownPeriod, _breakdownDayMillis) { period, day -> breakdownRangeFor(period, day) }
+            .flatMapLatest { (start, end) ->
+                orderRepository.getItemSalesBreakdownForRange(start, end)
+            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun updateConfig(targetSales: Double, startingCashFloat: Double, pinHash: String) {
         viewModelScope.launch {
