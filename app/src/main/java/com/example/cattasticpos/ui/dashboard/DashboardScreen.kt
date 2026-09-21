@@ -220,7 +220,7 @@ fun DashboardScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+                .padding(top = innerPadding.calculateTopPadding())
                 .background(MaterialTheme.colorScheme.background)
         ) {
             if (!uiState.activeTableLabel.isNullOrBlank() && cartItemCount > 0) {
@@ -691,6 +691,7 @@ private fun DashboardCheckoutPanel(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .navigationBarsPadding()
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
                 Row(

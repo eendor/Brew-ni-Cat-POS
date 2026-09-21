@@ -96,6 +96,9 @@ fun HistoryScreen(
     val exportMessage by viewModel.exportMessage.collectAsStateWithLifecycle()
     val appConfig by viewModel.appConfigState.collectAsStateWithLifecycle()
     val cashierSalesToday by viewModel.cashierSalesTodayState.collectAsStateWithLifecycle()
+    val itemSalesBreakdown by viewModel.itemSalesBreakdownState.collectAsStateWithLifecycle()
+    val breakdownPeriod by viewModel.breakdownPeriod.collectAsStateWithLifecycle()
+    val breakdownRange by viewModel.breakdownRangeState.collectAsStateWithLifecycle()
     val showDateRangeDialog by viewModel.showDateRangeDialog.collectAsStateWithLifecycle()
     val canLoadMore by viewModel.canLoadMore.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -152,7 +155,7 @@ fun HistoryScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+                .padding(top = innerPadding.calculateTopPadding())
                 .background(MaterialTheme.colorScheme.background)
         ) {
             AdaptiveAmbientGlows(Modifier.fillMaxSize())
@@ -492,6 +495,16 @@ fun HistoryScreen(
             }
                 }
 
+                item {
+                    FoodSalesBreakdownCard(
+                        breakdown = itemSalesBreakdown,
+                        period = breakdownPeriod,
+                        rangeStart = breakdownRange.first,
+                        rangeEnd = breakdownRange.second,
+                        onPeriodChange = { viewModel.setBreakdownPeriod(it) }
+                    )
+                }
+
             if (orders.isEmpty() && expensesList.isEmpty()) {
                 item {
                     Column(
@@ -696,6 +709,183 @@ fun HistoryScreen(
                         shareOrderReceipt(context, previewOrder)
                     }
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FoodSalesBreakdownCard(
+    breakdown: List<com.example.cattasticpos.domain.model.ItemSalesBreakdown>,
+    period: BreakdownPeriod,
+    rangeStart: Long,
+    rangeEnd: Long,
+    onPeriodChange: (BreakdownPeriod) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var expanded by remember { mutableStateOf(true) }
+    val grandTotal = remember(breakdown) { breakdown.sumOf { it.totalSales } }
+    val rangeLabel = remember(rangeStart, rangeEnd) {
+        val fmt = SimpleDateFormat("MMM d", Locale.getDefault())
+        "${fmt.format(Date(rangeStart))} – ${fmt.format(Date(rangeEnd))}"
+    }
+    // Group by category so foods and drinks read as separate sections, each food its own total.
+    val grouped = remember(breakdown) {
+        breakdown.groupBy { it.categoryName ?: "Other" }
+            .toList()
+            .sortedByDescending { (_, rows) -> rows.sumOf { it.totalSales } }
+    }
+
+    ObsidianGlassCard(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(bottom = 6.dp),
+        onClick = { expanded = !expanded }
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Food & Drink Totals",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "Per item · ${if (period == BreakdownPeriod.WEEK) "This Week" else "This Month"} ($rangeLabel)",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                }
+                FluentIcon(
+                    imageVector = if (expanded) FluentIcons.ChevronUp else FluentIcons.ChevronDown,
+                    contentDescription = "Expand/Collapse",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            AnimatedVisibility(visible = expanded) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Week / Month toggle
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                            .padding(3.dp),
+                        horizontalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        BreakdownPeriod.entries.forEach { p ->
+                            val selected = p == period
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(
+                                        if (selected) MaterialTheme.colorScheme.secondary
+                                        else Color.Transparent
+                                    )
+                                    .clickable { onPeriodChange(p) }
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = if (p == BreakdownPeriod.WEEK) "Per Week" else "Per Month",
+                                    fontSize = 13.sp,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (selected) MaterialTheme.colorScheme.onSecondary
+                                    else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    if (breakdown.isEmpty()) {
+                        Text(
+                            text = "No sales recorded for this ${if (period == BreakdownPeriod.WEEK) "week" else "month"} yet.",
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+                    } else {
+                        grouped.forEach { (categoryName, rows) ->
+                            val categoryTotal = rows.sumOf { it.totalSales }
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = categoryName,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.secondary
+                                )
+                                Text(
+                                    text = "₱${String.format(Locale.US, "%.0f", categoryTotal)}",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.secondary
+                                )
+                            }
+                            rows.sortedByDescending { it.totalSales }.forEach { row ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = row.itemName,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = "${row.totalQuantity} sold",
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                        )
+                                    }
+                                    Text(
+                                        text = "₱${String.format(Locale.US, "%.0f", row.totalSales)}",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.15f))
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "All Food & Drinks",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = "₱${String.format(Locale.US, "%.0f", grandTotal)}",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.secondary
+                            )
+                        }
+                    }
+                }
             }
         }
     }

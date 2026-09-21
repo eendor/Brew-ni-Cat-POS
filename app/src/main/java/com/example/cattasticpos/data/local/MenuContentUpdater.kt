@@ -21,6 +21,7 @@ internal object MenuContentUpdater {
         ensureAddOnInfrastructure(inventoryDao, recipeDao)
         applyMenuBoard2026Patch(menuDao, recipeDao)
         applyMenuSectionSplitPatch(menuDao, recipeDao)
+        ensureCatTreatsInfrastructure(menuDao)
         ensureBuldakInfrastructure(menuDao, inventoryDao, recipeDao)
         ensureTakeoutBoxInfrastructure(menuDao)
     }
@@ -137,5 +138,13 @@ internal object MenuContentUpdater {
         val takeoutCat = com.example.cattasticpos.data.local.entity.CategoryEntity("cat_takeout", "Take-out Box")
         menuDao.insertCategories(listOf(takeoutCat))
         menuDao.insertItems(listOf(MenuBoardCatalog.takeoutBoxItem()))
+    }
+
+    private suspend fun ensureCatTreatsInfrastructure(menuDao: MenuDao) {
+        val existing = menuDao.getItemById("bite_cat_treats")
+        if (existing != null) return
+        val treatsCat = com.example.cattasticpos.data.local.entity.CategoryEntity("cat_treats", "Cat Treats")
+        menuDao.insertCategories(listOf(treatsCat))
+        menuDao.insertItems(listOf(MenuBoardCatalog.catTreatsItem()))
     }
 }

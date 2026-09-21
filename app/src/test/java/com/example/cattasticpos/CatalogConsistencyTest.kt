@@ -51,7 +51,7 @@ class CatalogConsistencyTest {
 
     @Test
     fun `every item belongs to a seeded category`() {
-        val seeded = setOf("cat_bites", "cat_drinks", "combos", "cat_buldak", "cat_takeout")
+        val seeded = setOf("cat_bites", "cat_treats", "cat_drinks", "combos", "cat_buldak", "cat_takeout")
         val orphans = items.filter { it.categoryId !in seeded }.map { "${it.id} -> ${it.categoryId}" }
         assertTrue("items in a category that is never seeded: $orphans", orphans.isEmpty())
     }

@@ -242,13 +242,15 @@ class DashboardViewModel(
     /**
      * Drops unrequested Take-out Box add-on labels from non-standalone lines and
      * recomputes cart keys so totals never include a phantom +₱10 packaging fee.
-     * Standalone Take-out Box menu items (cat_takeout / bite_takeout_box) are kept.
+     * Standalone direct-add SKUs like Take-out Box and Cat Treats are kept.
      */
     private fun sanitizeCart(cart: List<CartItem>): List<CartItem> {
         return cart.mapNotNull { cartItem ->
             if (ProductAddOnCatalog.isDirectAddTakeoutItem(cartItem.item) ||
                 cartItem.item.id.equals("bite_takeout_box", ignoreCase = true) ||
-                cartItem.item.categoryId.equals("cat_takeout", ignoreCase = true)
+                cartItem.item.categoryId.equals("cat_takeout", ignoreCase = true) ||
+                cartItem.item.id.equals("bite_cat_treats", ignoreCase = true) ||
+                cartItem.item.categoryId.equals("cat_treats", ignoreCase = true)
             ) {
                 return@mapNotNull cartItem
             }

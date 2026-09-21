@@ -69,6 +69,7 @@ internal object DatabaseSeeder {
             menuDao.insertCategories(
                 listOf(
                     CategoryEntity("cat_bites", "Cat-Tastic Bites"),
+                    CategoryEntity("cat_treats", "Cat Treats"),
                     CategoryEntity("cat_drinks", "Cat-Tastic Drinks"),
                     CategoryEntity("combos", "Combos & Packages"),
                     CategoryEntity("cat_buldak", "Buldak & Sedaap"),

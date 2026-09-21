@@ -18,6 +18,7 @@ interface OrderRepository {
     fun getCashSalesForDay(startOfDay: Long, endOfDay: Long): Flow<Double?>
     fun getGcashSalesForDay(startOfDay: Long, endOfDay: Long): Flow<Double?>
     fun observeCashierSalesForDay(startOfDay: Long, endOfDay: Long): Flow<Map<String, Double>>
+    fun getItemSalesBreakdownForRange(startOfDay: Long, endOfDay: Long): Flow<List<com.example.cattasticpos.domain.model.ItemSalesBreakdown>>
     suspend fun deleteOrder(orderId: Long)
     suspend fun setOrderServed(orderId: Long, isServed: Boolean)
 }

@@ -12,6 +12,7 @@ internal object MenuBoardCatalog {
         takoyakiItem(),
         friesItem(),
         nachosItem(),
+        catTreatsItem(),
         takeoutBoxItem(),
         catFeineItem(),
         oreoDrinkItem(),
@@ -94,6 +95,18 @@ internal object MenuBoardCatalog {
               {"id":"nachos_veggies_meat","name":"Nachos+Veggies+Meat","basePrice":99.0,"priceByFlavor":{}},
               {"id":"nachos_fries_meat","name":"Nachos+Fries+Meat","basePrice":119.0,"priceByFlavor":{}},
               {"id":"nachos_fries_meat_veggies","name":"Nachos+Fries+Meat+Veggies","basePrice":129.0,"priceByFlavor":{}}
+            ]
+        """.trimIndent()
+    )
+
+    fun catTreatsItem(): ItemEntity = ItemEntity(
+        id = "bite_cat_treats",
+        categoryId = "cat_treats",
+        name = "Cat Treats",
+        flavors = "",
+        variantsJson = """
+            [
+              {"id":"regular","name":"Regular","basePrice":5.0,"priceByFlavor":{}}
             ]
         """.trimIndent()
     )

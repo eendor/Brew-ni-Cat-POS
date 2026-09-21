@@ -30,6 +30,13 @@ data class CashierSalesResult(
     val totalSales: Double?
 )
 
+data class ItemSalesBreakdownResult(
+    val itemName: String,
+    val categoryName: String?,
+    val totalQuantity: Int,
+    val totalSales: Double
+)
+
 @Dao
 interface OrderDao {
     @Insert
@@ -125,6 +132,29 @@ interface OrderDao {
         """
     )
     fun observeCashierSalesForDay(startOfDay: Long, endOfDay: Long): Flow<List<CashierSalesResult>>
+
+    /**
+     * Per-food sales totals for the History food/drink breakdown. Groups active order lines by
+     * item name so each food (Takoyaki, Fries, every Buldak variant, every drink) carries its own
+     * running total, independent of the shop-wide Z-Reading. Category name is resolved via a LEFT
+     * JOIN so lines whose item was later removed from the catalog still appear.
+     */
+    @Query(
+        """
+        SELECT oi.itemName AS itemName,
+               c.name AS categoryName,
+               SUM(oi.quantity) AS totalQuantity,
+               SUM(oi.totalPrice) AS totalSales
+        FROM order_items oi
+        JOIN orders o ON oi.orderId = o.id
+        LEFT JOIN items i ON oi.itemId = i.id
+        LEFT JOIN categories c ON i.categoryId = c.id
+        WHERE o.timestamp >= :startOfDay AND o.timestamp <= :endOfDay AND o.isVoided = 0
+        GROUP BY oi.itemName, c.name
+        ORDER BY totalSales DESC
+        """
+    )
+    fun getItemSalesBreakdownForRange(startOfDay: Long, endOfDay: Long): Flow<List<ItemSalesBreakdownResult>>
 
     @Query("DELETE FROM orders WHERE id = :orderId")
     suspend fun deleteOrderEntity(orderId: Long)

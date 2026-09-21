@@ -1,5 +1,6 @@
 package com.example.cattasticpos.ui.adaptive
 
+import android.annotation.SuppressLint
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
@@ -12,13 +13,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.MaterialTheme
@@ -130,6 +132,10 @@ fun BrewNiCatBrandIcon(modifier: Modifier = Modifier) {
     )
 }
 
+// Scaffold's content-padding is intentionally ignored: this scaffold sets contentWindowInsets to
+// zero and applies safe-drawing insets itself via windowInsetsPadding below, handing the content a
+// computed top inset for the collapsing header. Bottom chrome is owned by each screen.
+@SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
 fun CollapsingGlassScaffold(
     title: String,
@@ -141,7 +147,8 @@ fun CollapsingGlassScaffold(
     navigationIcon: @Composable () -> Unit = {},
     actions: @Composable RowScope.() -> Unit = {},
     snackbarHost: @Composable () -> Unit = {},
-    contentWindowInsets: WindowInsets = ScaffoldDefaults.contentWindowInsets,
+    // Edge-to-edge: bottom inset is handled by screen chrome (e.g. the order bar), not here.
+    contentWindowInsets: WindowInsets = WindowInsets(0, 0, 0, 0),
     content: @Composable (PaddingValues) -> Unit
 ) {
     val density = LocalDensity.current
@@ -188,19 +195,17 @@ fun CollapsingGlassScaffold(
             snackbarHost = snackbarHost,
             containerColor = MaterialTheme.colorScheme.background,
             contentWindowInsets = contentWindowInsets
-        ) { scaffoldPadding ->
+        ) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .safeDrawingPadding()
-                    .padding(scaffoldPadding)
-            ) {
-                content(
-                    PaddingValues(
-                        top = topContentInset,
-                        bottom = scaffoldPadding.calculateBottomPadding()
+                    .windowInsetsPadding(
+                        WindowInsets.safeDrawing.only(
+                            WindowInsetsSides.Top + WindowInsetsSides.Horizontal
+                        )
                     )
-                )
+            ) {
+                content(PaddingValues(top = topContentInset))
             }
         }
 

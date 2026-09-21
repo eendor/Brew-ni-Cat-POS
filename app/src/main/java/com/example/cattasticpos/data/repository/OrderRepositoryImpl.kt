@@ -173,6 +173,22 @@ class OrderRepositoryImpl(
         }
     }
 
+    override fun getItemSalesBreakdownForRange(
+        startOfDay: Long,
+        endOfDay: Long
+    ): Flow<List<com.example.cattasticpos.domain.model.ItemSalesBreakdown>> {
+        return orderDao.getItemSalesBreakdownForRange(startOfDay, endOfDay).map { rows ->
+            rows.map { row ->
+                com.example.cattasticpos.domain.model.ItemSalesBreakdown(
+                    itemName = row.itemName,
+                    categoryName = row.categoryName,
+                    totalQuantity = row.totalQuantity,
+                    totalSales = row.totalSales
+                )
+            }
+        }
+    }
+
     override suspend fun deleteOrder(orderId: Long) {
         // Soft delete: mark voided (kept for audit, hidden from lists) and queue for sync.
         val existingOrder = database.orderDao().getOrderWithItems(orderId) ?: return

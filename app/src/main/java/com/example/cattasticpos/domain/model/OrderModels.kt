@@ -43,3 +43,15 @@ data class OrderItem(
     val unitPrice: Double,
     val totalPrice: Double
 )
+
+/**
+ * Per-food sales total for the food/drink breakdown in History. Each menu item (Takoyaki, Fries,
+ * every Buldak variant, every drink, combos) becomes its own row with its own running total,
+ * kept entirely separate from the shop-wide Z-Reading figures.
+ */
+data class ItemSalesBreakdown(
+    val itemName: String,
+    val categoryName: String?,
+    val totalQuantity: Int,
+    val totalSales: Double
+)

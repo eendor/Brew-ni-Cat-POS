@@ -109,11 +109,17 @@ object ProductAddOnCatalog {
     fun labelsForIds(item: Item, selectedAddOnIds: List<String>): List<String> =
         labelsForIds(item.id, selectedAddOnIds, item.categoryId, item.name)
 
-    /** Standalone Take-out Box: no configuration sheet — add straight to cart. */
+    /**
+     * Standalone single-variant SKUs that should add straight to cart with no configuration sheet.
+     * Today that includes Take-out Box and Cat Treats.
+     */
     fun isDirectAddTakeoutItem(item: Item): Boolean {
-        val isTakeoutSku = item.id.equals("bite_takeout_box", ignoreCase = true) ||
-            item.categoryId.equals("cat_takeout", ignoreCase = true)
-        return isTakeoutSku &&
+        val isDirectAddSku =
+            item.id.equals("bite_takeout_box", ignoreCase = true) ||
+                item.categoryId.equals("cat_takeout", ignoreCase = true) ||
+                item.id.equals("bite_cat_treats", ignoreCase = true) ||
+                item.categoryId.equals("cat_treats", ignoreCase = true)
+        return isDirectAddSku &&
             item.variants.size == 1 &&
             !supportsAddOns(item)
     }
