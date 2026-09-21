@@ -13,7 +13,7 @@
   <img alt="kotlin" src="https://img.shields.io/badge/Kotlin-2.0.21-7F52FF">
   <img alt="compose" src="https://img.shields.io/badge/Jetpack%20Compose-BOM%202024.12-4285F4">
   <img alt="room" src="https://img.shields.io/badge/Room-schema%20v19-orange">
-  <img alt="version" src="https://img.shields.io/badge/release-1.1.0%20(10125)-blue">
+  <img alt="version" src="https://img.shields.io/badge/release-1.1.0%20(10134)-blue">
   <img alt="license" src="https://img.shields.io/badge/license-MIT-lightgrey">
 </p>
 
@@ -51,7 +51,7 @@ Three screens behind a launcher activity — deliberately flat, because speed at
 | Screen | Purpose |
 |---|---|
 | **Dashboard** | The register. Category tabs, product configuration sheet (flavor → size → extras), cart, held-order queue, discounts, cash/GCash checkout, expense entry. |
-| **History** | **PIN-protected.** Paged order log with date-range filter, swipe-to-reveal share/edit/void, expense timeline, cashier breakdown, and the Z-Reading summary + print. |
+| **History** | **PIN-protected.** Paged order log with date-range filter, swipe-to-reveal share/edit/void, expense timeline, cashier breakdown, the per-item **Food & Drink Totals** breakdown (per day / week / month), and the Z-Reading summary + print. |
 | **Inventory** | Raw materials, stock levels, reorder thresholds, and the recipe (BOM) editor mapping menu variants and flavors to ingredient deductions. |
 
 Three overlays sit above them:
@@ -84,7 +84,7 @@ app/src/main/java/com/example/cattasticpos/
 └─ ui/                 Compose screens, ViewModels, theme, adaptive/glass components
 ```
 
-117 Kotlin source files. Design notes worth knowing before changing things:
+118 Kotlin source files. Design notes worth knowing before changing things:
 
 - **`OrderSyncMerger` is the only path** that turns a cloud order into a local row. All three downloaders — realtime, historical pull, periodic catch-up — funnel through it so they can never disagree.
 - **`CalculateCartUseCase` is the single source of truth for money.** Every surface formats with `%.0f`, so discounts are settled to a whole peso there. Without that, receipts don't add up and the drawer doesn't reconcile against the Z-Reading.
@@ -99,7 +99,7 @@ Room schema **v19** — nine entities, fourteen migrations. `exportSchema = fals
 | Entity | Holds |
 |---|---|
 | `CategoryEntity` / `ItemEntity` | Menu catalog; variants and per-flavor prices stored as JSON on the item |
-| `OrderEntity` / `OrderItemEntity` | Orders and lines, plus `deviceId`, `syncStatus`, `remoteId`, `isVoided`, `isServed` |
+| `OrderEntity` / `OrderItemEntity` | Orders and lines, plus `deviceId`, `syncStatus`, `remoteId`, `isVoided`. (`isServed` remains in the schema and still syncs, but the Preparing/Served workflow was retired from the UI.) |
 | `InventoryEntity` | Raw materials, stock, reorder threshold |
 | `RecipeMappingEntity` | BOM: menu item + variant/flavor target → ingredient + quantity |
 | `ExpenseEntity` | Cash-drawer expenses |
@@ -170,7 +170,9 @@ Three rules keep this working:
 
 ## Web dashboard (`web/`)
 
-Next.js 14 App Router against the same Supabase project via `supabase-js`, live-updating through realtime subscriptions on orders, items, inventory, categories and expenses.
+Next.js 14 App Router against the same Supabase project via `supabase-js`, live-updating through realtime subscriptions on orders, items, inventory, categories and expenses. Styled as an Apple-inspired design system with a light/dark theme toggle (persisted, follows the OS preference on first visit).
+
+It mirrors the register's owner-facing reporting: an **End of Day report** with a report-day picker (pull up any past day's takings the morning after) showing net revenue and profits, plus the per-item **Food & Drink Totals** with a per day / week / month toggle — both computed from the already-synced orders, no extra tables.
 
 ```bash
 cd web
@@ -235,12 +237,14 @@ aapt dump badging check.apk | head -1
 
 ## Tests
 
-51 JVM unit tests over the pure logic — the parts where a mistake costs money.
+65 JVM unit tests over the pure logic — the parts where a mistake costs money.
 
 | Suite | Covers |
 |---|---|
 | `CartPricingTest` | Line totals, per-unit add-on surcharges, all discount strategies, flavor encode/parse |
 | `DiscountRoundingTest` | Whole-peso settlement across every discount and subtotal, discount-label round trip, add-on rebuild |
+| `AddOnEncodingTest` | Add-on selection encode/parse round trips |
+| `AddOnSurchargeRepairTest` | The one-time `18 → 19` data repair that re-prices historical add-on surcharges |
 | `RecipeDeductionResolverTest` | Base / size / flavor / composite / add-on BOM stacking |
 | `SyncIdentityTest` | Combo expansion maths, the cloud order-id contract and its `% 1e9` invariant |
 | `AddOnCatalogTest` | Sweeps the seeded catalog so retired add-ons cannot reappear via the default branch |
