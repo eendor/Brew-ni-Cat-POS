@@ -1133,10 +1133,10 @@ function Dashboard() {
             </span>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
-            {/* Theme toggle (all sizes) */}
+            {/* Theme toggle — mobile only; desktop uses the sidebar segmented control */}
             <button
               onClick={toggleTheme}
-              className="p-2 hover:bg-surface-2 active:bg-surface-3 rounded-xl text-txt-2 hover:text-txt-1 transition-colors border border-transparent hover:border-hair"
+              className="md:hidden p-2 hover:bg-surface-2 active:bg-surface-3 rounded-xl text-txt-2 hover:text-txt-1 transition-colors border border-transparent hover:border-hair"
               title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
             >
               {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
