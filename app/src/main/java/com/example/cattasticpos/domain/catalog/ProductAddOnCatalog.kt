@@ -51,6 +51,7 @@ object ProductAddOnCatalog {
 
         return when {
             id == "bite_takeout_box" || cat == "cat_takeout" -> emptyList()
+            id == "drink_bottled_water" -> emptyList()
             id == "drink_soda" || id.contains("soda") || name.contains("soda") -> sodaAddOns
             id == "bite_takoyaki" || id.contains("takoyaki") || name.contains("takoyaki") -> takoyakiAddOns
             id.startsWith("buldak") || id.startsWith("sedaap") ||
@@ -111,14 +112,15 @@ object ProductAddOnCatalog {
 
     /**
      * Standalone single-variant SKUs that should add straight to cart with no configuration sheet.
-     * Today that includes Take-out Box and Cat Treats.
+     * Today that includes Take-out Box, Cat Treats and Bottled Water.
      */
     fun isDirectAddTakeoutItem(item: Item): Boolean {
         val isDirectAddSku =
             item.id.equals("bite_takeout_box", ignoreCase = true) ||
                 item.categoryId.equals("cat_takeout", ignoreCase = true) ||
                 item.id.equals("bite_cat_treats", ignoreCase = true) ||
-                item.categoryId.equals("cat_treats", ignoreCase = true)
+                item.categoryId.equals("cat_treats", ignoreCase = true) ||
+                item.id.equals("drink_bottled_water", ignoreCase = true)
         return isDirectAddSku &&
             item.variants.size == 1 &&
             !supportsAddOns(item)

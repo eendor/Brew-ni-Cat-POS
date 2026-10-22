@@ -24,6 +24,7 @@ internal object MenuContentUpdater {
         ensureCatTreatsInfrastructure(menuDao)
         ensureBuldakInfrastructure(menuDao, inventoryDao, recipeDao)
         ensureTakeoutBoxInfrastructure(menuDao)
+        ensureBottledWaterItem(menuDao)
     }
 
     private suspend fun ensureBuldakInfrastructure(
@@ -138,6 +139,12 @@ internal object MenuContentUpdater {
         val takeoutCat = com.example.cattasticpos.data.local.entity.CategoryEntity("cat_takeout", "Take-out Box")
         menuDao.insertCategories(listOf(takeoutCat))
         menuDao.insertItems(listOf(MenuBoardCatalog.takeoutBoxItem()))
+    }
+
+    /** Adds Bottled Water (P15) once, so a price the owner edits later is not overwritten. */
+    private suspend fun ensureBottledWaterItem(menuDao: MenuDao) {
+        if (menuDao.getItemById("drink_bottled_water") != null) return
+        menuDao.insertItems(listOf(MenuBoardCatalog.bottledWaterItem()))
     }
 
     private suspend fun ensureCatTreatsInfrastructure(menuDao: MenuDao) {

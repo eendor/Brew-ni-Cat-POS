@@ -20,6 +20,7 @@ import com.composables.icons.lucide.CircleDot
 import com.composables.icons.lucide.Coffee
 import com.composables.icons.lucide.Cookie
 import com.composables.icons.lucide.CupSoda
+import com.composables.icons.lucide.GlassWater
 import com.composables.icons.lucide.Download
 import com.composables.icons.lucide.Flame
 import com.composables.icons.lucide.History
@@ -105,6 +106,7 @@ object FluentIcons {
             id == "drink_oreo" -> Lucide.Cookie
             id == "drink_matcha" -> Lucide.Leaf
             id == "drink_soda" -> Lucide.CupSoda
+            id == "drink_bottled_water" -> Lucide.GlassWater
             id == "drink_coffee" -> DrinkCoffee
             id == "bite_takoyaki" -> Lucide.CircleDot
             id == "bite_fries" -> Lucide.Flame

@@ -18,6 +18,7 @@ internal object MenuBoardCatalog {
         oreoDrinkItem(),
         matchaDrinkItem(),
         sodaItem(),
+        bottledWaterItem(),
         comboSinglePawItem(),
         comboCoupleCatsItem(),
         comboAssociationItem(),
@@ -119,6 +120,18 @@ internal object MenuBoardCatalog {
         variantsJson = """
             [
               {"id":"box","name":"Regular","basePrice":10.0,"priceByFlavor":{}}
+            ]
+        """.trimIndent()
+    )
+
+    fun bottledWaterItem(): ItemEntity = ItemEntity(
+        id = "drink_bottled_water",
+        categoryId = "cat_drinks",
+        name = "Bottled Water",
+        flavors = "",
+        variantsJson = """
+            [
+              {"id":"bottle","name":"Regular","basePrice":15.0,"priceByFlavor":{}}
             ]
         """.trimIndent()
     )

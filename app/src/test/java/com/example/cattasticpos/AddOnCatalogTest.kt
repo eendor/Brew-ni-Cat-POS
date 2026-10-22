@@ -33,7 +33,8 @@ class AddOnCatalogTest {
         Triple("drink_cat_feine", "cat_drinks", "Cat-feine"),
         Triple("drink_matcha", "cat_drinks", "Matcha"),
         Triple("drink_oreo", "cat_drinks", "Oreo"),
-        Triple("drink_soda", "cat_drinks", "Soda")
+        Triple("drink_soda", "cat_drinks", "Soda"),
+        Triple("drink_bottled_water", "cat_drinks", "Bottled Water")
     )
 
     @Test
@@ -66,6 +67,16 @@ class AddOnCatalogTest {
     fun `the standalone Take-out Box item still adds straight to the cart`() {
         val variant = Variant("takeout_regular", "Regular", 10.0)
         val item = Item("bite_takeout_box", "cat_takeout", "Take-out Box", emptyList(), listOf(variant))
+        assertTrue(ProductAddOnCatalog.isDirectAddTakeoutItem(item))
+        assertFalse(ProductAddOnCatalog.supportsAddOns(item))
+    }
+
+    @Test
+    fun `Bottled Water adds straight to the cart at 15 pesos with no add-ons`() {
+        val entity = com.example.cattasticpos.data.local.MenuBoardCatalog.bottledWaterItem()
+        assertEquals("cat_drinks", entity.categoryId)
+        assertTrue(entity.variantsJson.contains("\"basePrice\":15.0"))
+        val item = Item(entity.id, entity.categoryId, entity.name, emptyList(), listOf(Variant("bottle", "Regular", 15.0)))
         assertTrue(ProductAddOnCatalog.isDirectAddTakeoutItem(item))
         assertFalse(ProductAddOnCatalog.supportsAddOns(item))
     }
