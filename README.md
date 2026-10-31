@@ -13,7 +13,7 @@
   <img alt="kotlin" src="https://img.shields.io/badge/Kotlin-2.0.21-7F52FF">
   <img alt="compose" src="https://img.shields.io/badge/Jetpack%20Compose-BOM%202024.12-4285F4">
   <img alt="room" src="https://img.shields.io/badge/Room-schema%20v20-orange">
-  <img alt="version" src="https://img.shields.io/badge/release-1.1.0%20(10135)-blue">
+  <img alt="version" src="https://img.shields.io/badge/release-1.1.0%20(10136)-blue">
   <img alt="license" src="https://img.shields.io/badge/license-MIT-lightgrey">
 </p>
 
