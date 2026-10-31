@@ -1,5 +1,11 @@
 package com.example.cattasticpos.ui.menu
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -55,6 +61,14 @@ fun MenuEditorScreen(
     val cupertino = LocalCupertinoColors.current
 
     var showCategoryDialog by remember { mutableStateOf(false) }
+    val productListState = rememberLazyListState()
+    val showAddButton by remember {
+        derivedStateOf {
+            productListState.firstVisibleItemIndex == 0 ||
+                productListState.lastScrolledBackward ||
+                !productListState.canScrollForward
+        }
+    }
     var editingCategory by remember { mutableStateOf<Category?>(null) }
 
     var showProductDialog by remember { mutableStateOf(false) }
@@ -111,6 +125,12 @@ fun MenuEditorScreen(
         },
         snackbarHost = { AdaptiveSnackbarHost(hostState = snackbarHostState) },
         floatingActionButton = {
+            // Hidden while scrolling down so it never covers the last cards.
+            AnimatedVisibility(
+                visible = showAddButton,
+                enter = fadeIn() + scaleIn(),
+                exit = fadeOut() + scaleOut()
+            ) {
             AdaptiveFloatingActionButton(
                 onClick = {
                     editingItem = null
@@ -135,6 +155,7 @@ fun MenuEditorScreen(
                         fontSize = 14.sp
                     )
                 }
+            }
             }
         },
         modifier = modifier
@@ -246,6 +267,7 @@ fun MenuEditorScreen(
                 }
             } else {
                 LazyColumn(
+                    state = productListState,
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
@@ -772,11 +794,26 @@ private fun ProductEditorDialog(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        FilterChip(
-                            selected = selectedIconKey == null,
-                            onClick = { selectedIconKey = null },
-                            label = { Text("Auto", fontSize = 11.sp) }
-                        )
+                        val autoSelected = selectedIconKey == null
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (autoSelected) cupertino.accent.copy(alpha = 0.18f) else Color.Transparent,
+                            border = BorderStroke(
+                                width = if (autoSelected) 1.5.dp else 1.dp,
+                                color = if (autoSelected) cupertino.accent else MaterialTheme.colorScheme.outlineVariant
+                            ),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable { selectedIconKey = null }
+                        ) {
+                            Text(
+                                text = "Auto",
+                                fontSize = 11.sp,
+                                fontWeight = if (autoSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (autoSelected) cupertino.accent else MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                            )
+                        }
                         FluentIcons.productIconOptions.forEach { option ->
                             val isSelected = selectedIconKey == option.key
                             Surface(

@@ -84,6 +84,9 @@ object RecipeDeductionResolver {
 
     private fun flavorMatches(mappingTarget: String, flavor: String?): Boolean {
         if (flavor == null) return false
+        if (flavor.contains(CartLineSelection.MIX_SEPARATOR)) {
+            return CartLineSelection.mixParts(flavor).any { flavorMatches(mappingTarget, it) }
+        }
         if (mappingTarget == flavor) return true
         val cleanMapping = mappingTarget.substringAfter(": ").trim().ifEmpty { mappingTarget }
         val cleanFlavor = flavor.substringAfter(": ").trim().ifEmpty { flavor }

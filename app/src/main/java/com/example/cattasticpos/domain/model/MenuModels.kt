@@ -13,6 +13,11 @@ data class Variant(
     val description: String? = null
 ) {
     fun getPrice(flavor: String?): Double {
+        if (flavor != null && flavor.contains(CartLineSelection.MIX_SEPARATOR)) {
+            // A mix costs the size price. If this size prices flavors differently, take the
+            // dearest one in the mix so a mix never undercharges a single-flavor order.
+            return CartLineSelection.mixParts(flavor).maxOf { getPrice(it) }
+        }
         if (flavor != null) {
             val price = priceByFlavor[flavor]
             if (price != null) return price
