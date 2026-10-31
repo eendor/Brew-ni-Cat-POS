@@ -128,6 +128,8 @@ class MenuCatalogEditorTest {
         val initialConfig = appConfigDao.getAppConfigOnce()
         assertNotNull(initialConfig)
         assertEquals(MenuContentUpdater.CURRENT_CATALOG_VERSION, initialConfig!!.catalogVersion)
+        assertEquals(BuildConfig.SUPABASE_URL, initialConfig.supabaseUrl)
+        assertEquals(BuildConfig.SUPABASE_PUBLISHABLE_KEY, initialConfig.supabaseAnonKey)
 
         // 2. Owner edits an existing seeded item (buldak_carbo) and a takeout item (bite_takeout_box)
         val buldak = repository.getItems().first().first { it.id == "buldak_carbo" }

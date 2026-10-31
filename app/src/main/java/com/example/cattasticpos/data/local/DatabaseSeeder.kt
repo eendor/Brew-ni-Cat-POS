@@ -1,5 +1,6 @@
 package com.example.cattasticpos.data.local
 
+import com.example.cattasticpos.BuildConfig
 import com.example.cattasticpos.data.local.dao.AppConfigDao
 import com.example.cattasticpos.data.local.dao.InventoryDao
 import com.example.cattasticpos.data.local.dao.MenuDao
@@ -30,12 +31,15 @@ internal object DatabaseSeeder {
         val existingConfig = appConfigDao.getAppConfigOnce()
         if (existingConfig == null) {
             seedAppConfig(appConfigDao)
-        } else if (existingConfig.supabaseUrl.isBlank() || existingConfig.supabaseAnonKey.isBlank()) {
+        } else if (
+            (existingConfig.supabaseUrl.isBlank() && BuildConfig.SUPABASE_URL.isNotBlank()) ||
+            (existingConfig.supabaseAnonKey.isBlank() && BuildConfig.SUPABASE_PUBLISHABLE_KEY.isNotBlank())
+        ) {
             try {
                 appConfigDao.insertConfig(
                     existingConfig.copy(
-                        supabaseUrl = "https://hyeotyohpdpmmvquotnd.supabase.co",
-                        supabaseAnonKey = "sb_publishable_orak9Nk7HGB_qFHgXMdIzA_11T8NfYQ",
+                        supabaseUrl = existingConfig.supabaseUrl.ifBlank { BuildConfig.SUPABASE_URL },
+                        supabaseAnonKey = existingConfig.supabaseAnonKey.ifBlank { BuildConfig.SUPABASE_PUBLISHABLE_KEY },
                         deviceId = existingConfig.deviceId.ifBlank { java.util.UUID.randomUUID().toString() }
                     )
                 )
@@ -54,8 +58,8 @@ internal object DatabaseSeeder {
                     startingCashFloat = AppConfigEntity.DEFAULT_STARTING_CASH_FLOAT,
                     pinHash = "otCBSIxSZkk6vcF7SKwqCw==:Seyex1KVzCA7gLC3+1Vi8AHYtjU7A168GCGRihADbp0=",
                     cashiersJson = AppConfigEntity.DEFAULT_CASHIERS_JSON,
-                    supabaseUrl = "https://hyeotyohpdpmmvquotnd.supabase.co",
-                    supabaseAnonKey = "sb_publishable_orak9Nk7HGB_qFHgXMdIzA_11T8NfYQ",
+                    supabaseUrl = BuildConfig.SUPABASE_URL,
+                    supabaseAnonKey = BuildConfig.SUPABASE_PUBLISHABLE_KEY,
                     deviceId = java.util.UUID.randomUUID().toString(),
                     catalogVersion = MenuContentUpdater.CURRENT_CATALOG_VERSION
                 )

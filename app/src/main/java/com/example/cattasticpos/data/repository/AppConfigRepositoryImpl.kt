@@ -1,5 +1,6 @@
 package com.example.cattasticpos.data.repository
 
+import com.example.cattasticpos.BuildConfig
 import com.example.cattasticpos.data.local.dao.AppConfigDao
 import com.example.cattasticpos.data.local.entity.AppConfigEntity
 import com.example.cattasticpos.domain.model.AppConfig
@@ -111,8 +112,8 @@ class AppConfigRepositoryImpl(
             paymentConfig.cashiers.any { it.id == id }
         } ?: paymentConfig.cashiers.firstOrNull()?.id
 
-        val defaultUrl = "https://hyeotyohpdpmmvquotnd.supabase.co"
-        val defaultKey = "sb_publishable_orak9Nk7HGB_qFHgXMdIzA_11T8NfYQ"
+        val defaultUrl = BuildConfig.SUPABASE_URL
+        val defaultKey = BuildConfig.SUPABASE_PUBLISHABLE_KEY
         
         var shouldUpdate = false
         var updatedEntity = entity
@@ -129,7 +130,7 @@ class AppConfigRepositoryImpl(
             entity.deviceId
         }
 
-        val actualUrl = if (entity.supabaseUrl.isBlank()) {
+        val actualUrl = if (entity.supabaseUrl.isBlank() && defaultUrl.isNotBlank()) {
             updatedEntity = updatedEntity.copy(supabaseUrl = defaultUrl)
             shouldUpdate = true
             defaultUrl
@@ -137,7 +138,7 @@ class AppConfigRepositoryImpl(
             entity.supabaseUrl
         }
 
-        val actualKey = if (entity.supabaseAnonKey.isBlank()) {
+        val actualKey = if (entity.supabaseAnonKey.isBlank() && defaultKey.isNotBlank()) {
             updatedEntity = updatedEntity.copy(supabaseAnonKey = defaultKey)
             shouldUpdate = true
             defaultKey
