@@ -297,6 +297,7 @@ fun MenuEditorScreen(
             defaultCategoryId = uiState.selectedCategoryFilterId
                 ?: uiState.categories.firstOrNull()?.id.orEmpty(),
             onDismiss = { showProductDialog = false },
+            onAddCategory = { newName -> viewModel.saveCategory(null, newName) },
             onSave = { name, categoryId, icon, isAvailable, flavors, variants ->
                 viewModel.saveItem(
                     existingId = editingItem?.id,
@@ -313,7 +314,7 @@ fun MenuEditorScreen(
     }
 
     confirmDeleteItem?.let { itemToDelete ->
-        AdaptiveGlassDialog(onDismissRequest = { confirmDeleteItem = null }) {
+        AdaptiveGlassDialog(onDismissRequest = { confirmDeleteItem = null }, surfaceAlpha = 0.97f) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
                     text = "Delete \"${itemToDelete.name}\"?",
@@ -390,26 +391,30 @@ private fun MenuEditorProductCard(
             )
 
             Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = item.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(Modifier.height(4.dp))
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Text(
-                        text = item.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
                     Surface(
                         color = cupertino.accent.copy(alpha = 0.14f),
-                        shape = RoundedCornerShape(6.dp)
+                        shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier.weight(1f, fill = false)
                     ) {
                         Text(
                             text = categoryName,
                             color = cupertino.accent,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
                     }
@@ -422,6 +427,7 @@ private fun MenuEditorProductCard(
                                 text = iconOption.label,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 10.sp,
+                                maxLines = 1,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             )
                         }
@@ -432,7 +438,9 @@ private fun MenuEditorProductCard(
                 Text(
                     text = variantsSummary.ifEmpty { "No sizes configured" },
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
 
                 if (item.flavors.isNotEmpty()) {
@@ -499,7 +507,7 @@ private fun CategoryEditorDialog(
 ) {
     var name by remember(existingCategory) { mutableStateOf(existingCategory?.name.orEmpty()) }
 
-    AdaptiveGlassDialog(onDismissRequest = onDismiss) {
+    AdaptiveGlassDialog(onDismissRequest = onDismiss, surfaceAlpha = 0.97f) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(
                 text = if (existingCategory == null) "Add Category" else "Edit Category",
@@ -570,6 +578,7 @@ private fun ProductEditorDialog(
     categories: List<Category>,
     defaultCategoryId: String,
     onDismiss: () -> Unit,
+    onAddCategory: (String) -> String?,
     onSave: (
         name: String,
         categoryId: String,
@@ -588,6 +597,8 @@ private fun ProductEditorDialog(
     var isAvailable by remember(existingItem) { mutableStateOf(existingItem?.isAvailable ?: true) }
     var flavors by remember(existingItem) { mutableStateOf(existingItem?.flavors ?: emptyList()) }
     var newFlavorInput by remember { mutableStateOf("") }
+    var addingCategory by remember { mutableStateOf(false) }
+    var newCategoryName by remember { mutableStateOf("") }
     var showFlavorOverrides by remember(existingItem) {
         mutableStateOf(existingItem?.variants?.any { it.priceByFlavor.isNotEmpty() } == true)
     }
@@ -624,7 +635,7 @@ private fun ProductEditorDialog(
         )
     }
 
-    AdaptiveGlassDialog(onDismissRequest = onDismiss) {
+    AdaptiveGlassDialog(onDismissRequest = onDismiss, surfaceAlpha = 0.97f) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -667,6 +678,44 @@ private fun ProductEditorDialog(
                                 onClick = { selectedCategoryId = cat.id },
                                 label = { Text(cat.name) }
                             )
+                        }
+                        item(key = "add_category") {
+                            AssistChip(
+                                onClick = { addingCategory = !addingCategory },
+                                label = { Text("New category") },
+                                leadingIcon = {
+                                    FluentIcon(
+                                        imageVector = FluentIcons.Add,
+                                        contentDescription = null,
+                                        size = 16.dp,
+                                        tint = cupertino.accent
+                                    )
+                                }
+                            )
+                        }
+                    }
+                    if (addingCategory) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = newCategoryName,
+                                onValueChange = { newCategoryName = it },
+                                label = { Text("Category name") },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f)
+                            )
+                            TextButton(
+                                enabled = newCategoryName.isNotBlank(),
+                                onClick = {
+                                    onAddCategory(newCategoryName)?.let { selectedCategoryId = it }
+                                    newCategoryName = ""
+                                    addingCategory = false
+                                }
+                            ) {
+                                Text("Add", color = cupertino.accent, fontWeight = FontWeight.SemiBold)
+                            }
                         }
                     }
                 }
@@ -735,11 +784,11 @@ private fun ProductEditorDialog(
                                 color = if (isSelected) {
                                     cupertino.accent.copy(alpha = 0.18f)
                                 } else {
-                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+                                    Color.Transparent
                                 },
                                 border = BorderStroke(
                                     width = if (isSelected) 1.5.dp else 1.dp,
-                                    color = if (isSelected) cupertino.accent else Color.Transparent
+                                    color = if (isSelected) cupertino.accent else MaterialTheme.colorScheme.outlineVariant
                                 ),
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(10.dp))
