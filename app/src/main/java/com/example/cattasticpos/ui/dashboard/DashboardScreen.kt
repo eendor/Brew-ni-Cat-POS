@@ -1763,7 +1763,7 @@ fun ProductConfigBottomSheet(item: Item, onDismiss: () -> Unit, onAddToCart: (Va
                                 }
                             }
                             Spacer(modifier = Modifier.height(12.dp))
-                            if (flavorsForStep.size > 1) {
+                            if (flavorsForStep.size > 1 && ProductAddOnCatalog.allowsFlavorMix(item)) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
