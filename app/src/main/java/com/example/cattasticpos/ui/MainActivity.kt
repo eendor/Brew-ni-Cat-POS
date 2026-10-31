@@ -28,6 +28,8 @@ import com.example.cattasticpos.ui.history.HistoryScreen
 import com.example.cattasticpos.ui.history.HistoryViewModel
 import com.example.cattasticpos.ui.inventory.InventoryScreen
 import com.example.cattasticpos.ui.inventory.InventoryViewModel
+import com.example.cattasticpos.ui.menu.MenuEditorScreen
+import com.example.cattasticpos.ui.menu.MenuEditorViewModel
 import com.example.cattasticpos.ui.components.PinScreen
 import com.example.cattasticpos.ui.components.AppUpdateGate
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -107,6 +109,7 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     var currentScreen by remember { mutableStateOf("dashboard") }
+                    var menuEditorReturnScreen by remember { mutableStateOf("dashboard") }
                     var isPushing by remember { mutableStateOf(true) }
                     val performFeedback = rememberPosFeedback()
 
@@ -123,6 +126,7 @@ class MainActivity : ComponentActivity() {
                     val dashboardViewModel: DashboardViewModel = viewModel(factory = DashboardViewModel.Factory)
                     val historyViewModel: HistoryViewModel = viewModel(factory = HistoryViewModel.Factory)
                     val inventoryViewModel: InventoryViewModel = viewModel(factory = InventoryViewModel.Factory)
+                    val menuEditorViewModel: MenuEditorViewModel = viewModel(factory = MenuEditorViewModel.Factory)
 
                     ParallaxNavHost(
                         targetScreen = currentScreen,
@@ -145,13 +149,34 @@ class MainActivity : ComponentActivity() {
                             "history" -> {
                                 HistoryScreen(
                                     viewModel = historyViewModel,
-                                    onNavigateBack = { navigateTo("dashboard") }
+                                    onNavigateBack = { navigateTo("dashboard") },
+                                    onNavigateToMenuEditor = {
+                                        menuEditorReturnScreen = "history"
+                                        navigateTo("menu_editor")
+                                    }
                                 )
                             }
                             "inventory" -> {
                                 InventoryScreen(
                                     viewModel = inventoryViewModel,
-                                    onNavigateBack = { navigateTo("dashboard") }
+                                    onNavigateBack = { navigateTo("dashboard") },
+                                    onNavigateToMenuEditor = {
+                                        menuEditorReturnScreen = "inventory"
+                                        navigateTo("pin_menu_editor")
+                                    }
+                                )
+                            }
+                            "pin_menu_editor" -> {
+                                PinScreen(
+                                    subtitle = "Enter your PIN to edit menu products & categories",
+                                    onPinSuccess = { navigateTo("menu_editor") },
+                                    onCancel = { navigateTo(menuEditorReturnScreen) }
+                                )
+                            }
+                            "menu_editor" -> {
+                                MenuEditorScreen(
+                                    viewModel = menuEditorViewModel,
+                                    onNavigateBack = { navigateTo(menuEditorReturnScreen) }
                                 )
                             }
                         }

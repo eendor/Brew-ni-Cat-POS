@@ -1,22 +1,46 @@
 package com.example.cattasticpos.data.local
 
+import com.example.cattasticpos.data.local.dao.AppConfigDao
 import com.example.cattasticpos.data.local.dao.InventoryDao
 import com.example.cattasticpos.data.local.dao.MenuDao
 import com.example.cattasticpos.data.local.dao.RecipeDao
+import com.example.cattasticpos.data.local.entity.CategoryEntity
 import com.example.cattasticpos.data.local.entity.InventoryEntity
 import com.example.cattasticpos.data.local.entity.ItemEntity
 import org.json.JSONArray
+import java.util.Collections
+import java.util.WeakHashMap
 
 /**
- * Idempotent menu/inventory patches for installs that already have seeded data.
+ * One-time menu/inventory patches for installs upgrading from older catalog versions.
+ *
+ * Once applied (`catalogVersion >= CURRENT_CATALOG_VERSION`), this updater never runs again on
+ * that database so owner edits (name, price, icon, availability) and owner deletions are never
+ * overwritten or restored on restart.
  */
 internal object MenuContentUpdater {
+
+    const val CURRENT_CATALOG_VERSION = 1
+
+    private val patchedMenuDaos = Collections.synchronizedSet(
+        Collections.newSetFromMap(WeakHashMap<MenuDao, Boolean>())
+    )
 
     suspend fun applyPendingUpdates(
         menuDao: MenuDao,
         inventoryDao: InventoryDao,
-        recipeDao: RecipeDao
+        recipeDao: RecipeDao,
+        appConfigDao: AppConfigDao? = null
     ) {
+        val currentConfig = appConfigDao?.getAppConfigOnce()
+        if (currentConfig != null && currentConfig.catalogVersion >= CURRENT_CATALOG_VERSION) {
+            patchedMenuDaos.add(menuDao)
+            return
+        }
+        if (currentConfig == null && patchedMenuDaos.contains(menuDao)) {
+            return
+        }
+
         ensureShrimpInfrastructure(inventoryDao, recipeDao)
         ensureAddOnInfrastructure(inventoryDao, recipeDao)
         applyMenuBoard2026Patch(menuDao, recipeDao)
@@ -25,6 +49,25 @@ internal object MenuContentUpdater {
         ensureBuldakInfrastructure(menuDao, inventoryDao, recipeDao)
         ensureTakeoutBoxInfrastructure(menuDao)
         ensureBottledWaterItem(menuDao)
+
+        patchedMenuDaos.add(menuDao)
+        if (currentConfig != null) {
+            appConfigDao?.insertConfig(currentConfig.copy(catalogVersion = CURRENT_CATALOG_VERSION))
+        }
+    }
+
+    private suspend fun insertMissingCategories(menuDao: MenuDao, categories: List<CategoryEntity>) {
+        val missing = categories.filter { menuDao.getCategoryById(it.id) == null }
+        if (missing.isNotEmpty()) {
+            menuDao.insertCategories(missing)
+        }
+    }
+
+    private suspend fun insertMissingItems(menuDao: MenuDao, items: List<ItemEntity>) {
+        val missing = items.filter { menuDao.getItemById(it.id) == null }
+        if (missing.isNotEmpty()) {
+            menuDao.insertItems(missing)
+        }
     }
 
     private suspend fun ensureBuldakInfrastructure(
@@ -32,11 +75,8 @@ internal object MenuContentUpdater {
         inventoryDao: InventoryDao,
         recipeDao: RecipeDao
     ) {
-        val buldakCat = com.example.cattasticpos.data.local.entity.CategoryEntity("cat_buldak", "Buldak & Sedaap")
-        menuDao.insertCategories(listOf(buldakCat))
-
-        val buldakItems = MenuBoardCatalog.buldakMenuItems()
-        menuDao.insertItems(buldakItems)
+        insertMissingCategories(menuDao, listOf(CategoryEntity("cat_buldak", "Buldak & Sedaap")))
+        insertMissingItems(menuDao, MenuBoardCatalog.buldakMenuItems())
 
         val newInventory = listOf(
             InventoryEntity("inv_buldak_carbo", "Buldak Carbo Samyang", "pack", 100.0, 20.0),
@@ -103,17 +143,16 @@ internal object MenuContentUpdater {
         val combo = menuDao.getItemById("combo_meals") ?: return
         if (isMenuBoard2026Applied(combo)) return
 
-        menuDao.insertItems(MenuBoardCatalog.allMenuItems())
+        insertMissingItems(menuDao, MenuBoardCatalog.allMenuItems())
         recipeDao.insertMappings(MenuBoardCatalog.shrimpTakoyakiRecipeMappings())
     }
 
     private suspend fun applyMenuSectionSplitPatch(menuDao: MenuDao, recipeDao: RecipeDao) {
-        val splitApplied = menuDao.getItemById("drink_cat_feine") != null &&
-            menuDao.getItemById("drink_coffee") == null &&
-            menuDao.getItemById("combo_meals") == null
-        if (splitApplied) return
+        val legacyPresent = menuDao.getItemById("drink_coffee") != null ||
+            menuDao.getItemById("combo_meals") != null
+        if (!legacyPresent) return
 
-        menuDao.insertItems(MenuBoardCatalog.drinkAndComboMenuItems())
+        insertMissingItems(menuDao, MenuBoardCatalog.drinkAndComboMenuItems())
         menuDao.deleteItemsByIds(listOf("drink_coffee", "combo_meals"))
         recipeDao.deleteMappingsForMenuItem("drink_coffee")
         recipeDao.insertMappings(MenuBoardCatalog.coffeeCupRecipeMappings())
@@ -136,22 +175,16 @@ internal object MenuContentUpdater {
     }
 
     private suspend fun ensureTakeoutBoxInfrastructure(menuDao: MenuDao) {
-        val takeoutCat = com.example.cattasticpos.data.local.entity.CategoryEntity("cat_takeout", "Take-out Box")
-        menuDao.insertCategories(listOf(takeoutCat))
-        menuDao.insertItems(listOf(MenuBoardCatalog.takeoutBoxItem()))
+        insertMissingCategories(menuDao, listOf(CategoryEntity("cat_takeout", "Take-out Box")))
+        insertMissingItems(menuDao, listOf(MenuBoardCatalog.takeoutBoxItem()))
     }
 
-    /** Adds Bottled Water (P15) once, so a price the owner edits later is not overwritten. */
     private suspend fun ensureBottledWaterItem(menuDao: MenuDao) {
-        if (menuDao.getItemById("drink_bottled_water") != null) return
-        menuDao.insertItems(listOf(MenuBoardCatalog.bottledWaterItem()))
+        insertMissingItems(menuDao, listOf(MenuBoardCatalog.bottledWaterItem()))
     }
 
     private suspend fun ensureCatTreatsInfrastructure(menuDao: MenuDao) {
-        val existing = menuDao.getItemById("bite_cat_treats")
-        if (existing != null) return
-        val treatsCat = com.example.cattasticpos.data.local.entity.CategoryEntity("cat_treats", "Cat Treats")
-        menuDao.insertCategories(listOf(treatsCat))
-        menuDao.insertItems(listOf(MenuBoardCatalog.catTreatsItem()))
+        insertMissingCategories(menuDao, listOf(CategoryEntity("cat_treats", "Cat Treats")))
+        insertMissingItems(menuDao, listOf(MenuBoardCatalog.catTreatsItem()))
     }
 }

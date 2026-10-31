@@ -12,7 +12,7 @@
   <img alt="platform" src="https://img.shields.io/badge/platform-Android%208.0%2B-3DDC84">
   <img alt="kotlin" src="https://img.shields.io/badge/Kotlin-2.0.21-7F52FF">
   <img alt="compose" src="https://img.shields.io/badge/Jetpack%20Compose-BOM%202024.12-4285F4">
-  <img alt="room" src="https://img.shields.io/badge/Room-schema%20v19-orange">
+  <img alt="room" src="https://img.shields.io/badge/Room-schema%20v20-orange">
   <img alt="version" src="https://img.shields.io/badge/release-1.1.0%20(10135)-blue">
   <img alt="license" src="https://img.shields.io/badge/license-MIT-lightgrey">
 </p>
@@ -46,17 +46,18 @@ The register runs on a Redmi Pad 2 in the shop. Updates ship over the air: the a
 
 ## Screens
 
-Three screens behind a launcher activity — deliberately flat, because speed at the counter beats navigation depth.
+Four screens behind a launcher activity — deliberately flat, because speed at the counter beats navigation depth.
 
 | Screen | Purpose |
 |---|---|
 | **Dashboard** | The register. Category tabs, product configuration sheet (flavor → size → extras), cart, held-order queue, discounts, cash/GCash checkout, expense entry. |
 | **History** | **PIN-protected.** Paged order log with date-range filter, swipe-to-reveal share/edit/void, expense timeline, cashier breakdown, the per-item **Food & Drink Totals** breakdown (per day / week / month), and the Z-Reading summary + print. |
 | **Inventory** | Raw materials, stock levels, reorder thresholds, and the recipe (BOM) editor mapping menu variants and flavors to ingredient deductions. |
+| **Menu & Categories** | **PIN-protected.** Add, edit, or delete menu categories and products, pick from 30 product icons, configure sizes and per-flavor prices, and toggle item availability (`Available` / `Sold Out`). |
 
 Three overlays sit above them:
 
-- **`PinScreen`** — guards History, which exposes takings and settings.
+- **`PinScreen`** — guards History and the Menu & Categories editor, which expose takings, settings, and catalog edits.
 - **`SyncLoginGate`** — one-time store-account sign-in. Selling works fully without it; cloud sync stays off until it's done.
 - **`AppUpdateGate`** — checks for a newer build on launch, downloads it, and opens the installer. Dismissible with *Hide* while it downloads.
 
@@ -94,17 +95,17 @@ app/src/main/java/com/example/cattasticpos/
 
 ## Data model
 
-Room schema **v19** — nine entities, fourteen migrations. `exportSchema = false`, and there is no destructive-migration fallback, so every schema bump needs a real migration path. Migrations are not all schema changes: `18 → 19` alters no table at all and exists only so a one-time data repair runs exactly once per device.
+Room schema **v20** — nine entities, fifteen migrations. `exportSchema = false`, and there is no destructive-migration fallback, so every schema bump needs a real migration path. Migrations are not all schema changes: `18 → 19` alters no table at all and exists only so a one-time data repair runs exactly once per device.
 
 | Entity | Holds |
 |---|---|
-| `CategoryEntity` / `ItemEntity` | Menu catalog; variants and per-flavor prices stored as JSON on the item |
+| `CategoryEntity` / `ItemEntity` | Menu catalog; variants and per-flavor prices stored as JSON on the item, plus `isAvailable` and optional `icon` key |
 | `OrderEntity` / `OrderItemEntity` | Orders and lines, plus `deviceId`, `syncStatus`, `remoteId`, `isVoided`. (`isServed` remains in the schema and still syncs, but the Preparing/Served workflow was retired from the UI.) |
 | `InventoryEntity` | Raw materials, stock, reorder threshold |
 | `RecipeMappingEntity` | BOM: menu item + variant/flavor target → ingredient + quantity |
 | `ExpenseEntity` | Cash-drawer expenses |
 | `VoidRecordEntity` | Void audit trail — voids are soft, orders are flagged and never deleted |
-| `AppConfigEntity` | Single row (`id = 1`): targets, float, PIN hash, cashiers/GCash JSON, Supabase URL/key, device id |
+| `AppConfigEntity` | Single row (`id = 1`): targets, float, PIN hash, cashiers/GCash JSON, Supabase URL/key, device id, `catalogVersion` |
 
 > ⚠️ **`app_config` is written with `OnConflictStrategy.REPLACE`.** Every writer must carry the whole row forward. Rebuilding the entity from scratch silently blanks the sync fields and re-mints the device id on the next read.
 

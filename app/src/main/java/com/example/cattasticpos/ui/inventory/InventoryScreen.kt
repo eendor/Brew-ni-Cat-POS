@@ -44,6 +44,7 @@ import com.example.cattasticpos.domain.usecase.RecipeDeductionResolver
 fun InventoryScreen(
     viewModel: InventoryViewModel,
     onNavigateBack: () -> Unit,
+    onNavigateToMenuEditor: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -67,6 +68,18 @@ fun InventoryScreen(
                                 size = 24.dp
                             )
                         }
+                    }
+                },
+                actions = {
+                    TextButton(onClick = onNavigateToMenuEditor) {
+                        FluentIcon(
+                            imageVector = FluentIcons.Utensils,
+                            contentDescription = "Edit Menu (PIN)",
+                            tint = cupertino.accent,
+                            size = 18.dp
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text("Edit Menu (PIN)", color = cupertino.accent, fontWeight = FontWeight.SemiBold)
                     }
                 }
             )

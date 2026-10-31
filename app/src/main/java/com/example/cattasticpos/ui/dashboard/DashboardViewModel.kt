@@ -179,6 +179,12 @@ class DashboardViewModel(
     }
 
     fun showConfigurationSheet(item: Item) {
+        if (!item.isAvailable) {
+            _uiState.update { state ->
+                state.copy(snackbarMessage = "${item.name} is currently marked sold out")
+            }
+            return
+        }
         if (ProductAddOnCatalog.isDirectAddTakeoutItem(item)) {
             val variant = item.variants.firstOrNull() ?: return
             applyCartMutation(item, variant, flavor = null)

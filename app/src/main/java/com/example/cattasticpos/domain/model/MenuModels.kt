@@ -34,7 +34,9 @@ data class Item(
     val categoryId: String,
     val name: String,
     val flavors: List<String>,
-    val variants: List<Variant>
+    val variants: List<Variant>,
+    val isAvailable: Boolean = true,
+    val icon: String? = null
 ) {
     // Helper to get starting price
     val startingPrice: Double

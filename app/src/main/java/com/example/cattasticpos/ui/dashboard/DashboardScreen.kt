@@ -1160,7 +1160,8 @@ fun ItemCard(
     ObsidianGlassCard(
         modifier = modifier
             .fillMaxWidth()
-            .height(128.dp),
+            .height(128.dp)
+            .graphicsLayer { alpha = if (item.isAvailable) 1f else 0.55f },
         onClick = {
             performFeedback(FeedbackEvent(BionicHaptic.Selection, PosSound.Tap))
             onClick()
@@ -1172,10 +1173,10 @@ fun ItemCard(
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
                 PosIconBadge(
-                    imageVector = FluentIcons.menuItemIcon(item.id),
+                    imageVector = FluentIcons.menuItemIcon(item.id, item.icon),
                     contentDescription = null,
                     emphasized = false,
-                    error = isLowStock,
+                    error = isLowStock || !item.isAvailable,
                     iconSize = PosIconSize.Medium
                 )
                 Column {
@@ -1203,7 +1204,16 @@ fun ItemCard(
                     )
                 }
             }
-            if (isLowStock) {
+            if (!item.isAvailable) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .background(Color(0xFFFF6B6B).copy(alpha = 0.28f), RoundedCornerShape(bottomStart = 12.dp))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text("Sold Out", color = Color(0xFFFF8A8A), fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                }
+            } else if (isLowStock) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
@@ -1684,7 +1694,7 @@ fun ProductConfigBottomSheet(item: Item, onDismiss: () -> Unit, onAddToCart: (Va
                                         FlavorOptionRow(
                                             label = group,
                                             isSelected = selectedFlavorGroup == group,
-                                            leadingIcon = FluentIcons.menuItemIcon(item.id),
+                                            leadingIcon = FluentIcons.menuItemIcon(item.id, item.icon),
                                             onSelect = {
                                                 selectedFlavorGroup = group
                                                 selectedFlavor = null
@@ -1724,7 +1734,7 @@ fun ProductConfigBottomSheet(item: Item, onDismiss: () -> Unit, onAddToCart: (Va
                                         FlavorOptionRow(
                                             label = flavor.substringAfter(": ").trim(),
                                             isSelected = selectedFlavor == flavor,
-                                            leadingIcon = FluentIcons.menuItemIcon(item.id),
+                                            leadingIcon = FluentIcons.menuItemIcon(item.id, item.icon),
                                             onSelect = {
                                                 selectedFlavor = flavor
                                                 selectedVariant = if (item.variants.size == 1) item.variants.firstOrNull() else null
@@ -2046,7 +2056,7 @@ private fun VariantOptionRow(
         label = variant.name,
         isSelected = isSelected,
         onSelect = onSelect,
-        leadingIcon = FluentIcons.menuItemIcon(item.id),
+        leadingIcon = FluentIcons.menuItemIcon(item.id, item.icon),
         trailing = priceLabel
     )
 }

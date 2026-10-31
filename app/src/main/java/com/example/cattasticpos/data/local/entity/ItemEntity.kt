@@ -22,5 +22,7 @@ data class ItemEntity(
     val categoryId: String,
     val name: String,
     val flavors: String,      // Comma or pipe separated list of flavors, e.g. "Veggie Whiskers|Cheesy Calico|Octo-Paws"
-    val variantsJson: String  // JSON structure detailing variants (size and pricing configurations)
+    val variantsJson: String, // JSON structure detailing variants (size and pricing configurations)
+    val isAvailable: Boolean = true,
+    val icon: String? = null
 )
