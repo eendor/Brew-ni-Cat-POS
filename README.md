@@ -189,6 +189,8 @@ Falls back to the shipped project URL and publishable key when `NEXT_PUBLIC_SUPA
 
 **Requirements:** JDK 17+, Android SDK 34, Android Studio (latest stable).
 
+Set `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` in `local.properties` (or as Gradle properties / environment variables) so `app/build.gradle.kts` injects `BuildConfig.SUPABASE_URL` and `BuildConfig.SUPABASE_PUBLISHABLE_KEY` at build time without hardcoding credentials in Kotlin source.
+
 ```bash
 git clone https://github.com/RodneeGlenMartin/Brew-ni-Cat-POS.git
 cd Brew-ni-Cat-POS

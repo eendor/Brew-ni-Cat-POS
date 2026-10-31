@@ -1,9 +1,33 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
 }
+
+val localProps = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.isFile) {
+        file.inputStream().use { load(it) }
+    }
+}
+
+fun resolveConfigProperty(vararg keys: String): String {
+    for (key in keys) {
+        val fromProp = localProps.getProperty(key)?.trim()
+        if (!fromProp.isNullOrEmpty()) return fromProp
+        val fromGradle = providers.gradleProperty(key).orNull?.trim()
+        if (!fromGradle.isNullOrEmpty()) return fromGradle
+        val fromEnv = System.getenv(key)?.trim()
+        if (!fromEnv.isNullOrEmpty()) return fromEnv
+    }
+    return ""
+}
+
+fun escapeBuildConfigString(value: String): String =
+    "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
 android {
     namespace = "com.example.cattasticpos"
@@ -17,6 +41,16 @@ android {
         versionName = "1.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        val supabaseUrl = resolveConfigProperty("SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL")
+        val supabasePublishableKey = resolveConfigProperty(
+            "SUPABASE_PUBLISHABLE_KEY",
+            "SUPABASE_ANON_KEY",
+            "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+            "NEXT_PUBLIC_SUPABASE_ANON_KEY"
+        )
+        buildConfigField("String", "SUPABASE_URL", escapeBuildConfigString(supabaseUrl))
+        buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", escapeBuildConfigString(supabasePublishableKey))
     }
 
     signingConfigs {
