@@ -79,21 +79,23 @@ class MenuEditorViewModel(
         _uiState.update { it.copy(snackbarMessage = null) }
     }
 
-    fun saveCategory(existingId: String?, name: String) {
+    /** Saves a category and returns its id, or null when the name is empty. */
+    fun saveCategory(existingId: String?, name: String): String? {
         val trimmed = name.trim()
         if (trimmed.isEmpty()) {
             _uiState.update { it.copy(snackbarMessage = "Category name cannot be empty") }
-            return
+            return null
         }
+        val existingIds = _uiState.value.categories.map { it.id }.toSet()
+        val categoryId = existingId ?: generateUniqueSlugId("cat", trimmed, existingIds)
         viewModelScope.launch {
-            val existingIds = _uiState.value.categories.map { it.id }.toSet()
-            val categoryId = existingId ?: generateUniqueSlugId("cat", trimmed, existingIds)
             menuRepository.upsertCategory(Category(id = categoryId, name = trimmed))
             SyncWorker.triggerImmediateSync(appContext)
             _uiState.update {
                 it.copy(snackbarMessage = if (existingId == null) "Added category \"$trimmed\"" else "Updated category \"$trimmed\"")
             }
         }
+        return categoryId
     }
 
     fun deleteCategory(category: Category) {

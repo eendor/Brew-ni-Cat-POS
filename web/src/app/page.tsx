@@ -278,6 +278,8 @@ function Dashboard() {
   // Category Modal States
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
+  const [inlineCategoryName, setInlineCategoryName] = useState('');
+  const [addingInlineCategory, setAddingInlineCategory] = useState(false);
 
   // Inventory Modal States
   const [showInventoryModal, setShowInventoryModal] = useState(false);
@@ -835,6 +837,27 @@ function Dashboard() {
     setNewCategoryName('');
     setShowCategoryModal(false);
     fetchData();
+  };
+
+  // Add a category from the product form and select it
+  const handleAddInlineCategory = async () => {
+    const name = inlineCategoryName.trim();
+    if (!name) return;
+    const existing = categories.find(c => c.name.toLowerCase() === name.toLowerCase());
+    if (existing) {
+      setItemCategory(existing.id);
+    } else {
+      const catId = 'cat_' + name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+      const { error } = await supabase.from('categories').insert({ id: catId, name });
+      if (error) {
+        alert('Could not add the category. Please try again.');
+        return;
+      }
+      setCategories(prev => [...prev, { id: catId, name } as Category].sort((a, b) => a.name.localeCompare(b.name)));
+      setItemCategory(catId);
+    }
+    setInlineCategoryName('');
+    setAddingInlineCategory(false);
   };
 
   // Save Item (New or Edit)
@@ -2308,14 +2331,58 @@ function Dashboard() {
                 <label className="text-[10px] font-bold uppercase tracking-wider text-txt-3">Category</label>
                 <select
                   value={itemCategory}
-                  onChange={e => setItemCategory(e.target.value)}
+                  onChange={e => {
+                    if (e.target.value === '__new__') {
+                      setAddingInlineCategory(true);
+                      return;
+                    }
+                    setItemCategory(e.target.value);
+                  }}
                   className="bg-surface-2 border border-hair px-4 py-2.5 rounded-2xl text-xs text-txt-1 outline-none focus:border-emerald-500/50 transition-all font-semibold"
                 >
                   <option value="" disabled>Select a category</option>
                   {categories.map(c => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
+                  <option value="__new__">+ New category…</option>
                 </select>
+                {addingInlineCategory && (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      autoFocus
+                      aria-label="New category name"
+                      placeholder="New category name"
+                      value={inlineCategoryName}
+                      onChange={e => setInlineCategoryName(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddInlineCategory();
+                        }
+                      }}
+                      className="flex-1 bg-surface-2 border border-hair px-4 py-2.5 rounded-2xl text-xs text-txt-1 outline-none focus:border-emerald-500/50 transition-all font-semibold"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddInlineCategory}
+                      disabled={!inlineCategoryName.trim()}
+                      className="px-4 py-2.5 rounded-2xl text-xs font-bold bg-emerald-600 text-white disabled:opacity-40"
+                    >
+                      Add
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAddingInlineCategory(false);
+                        setInlineCategoryName('');
+                      }}
+                      className="px-3 py-2.5 rounded-2xl text-xs font-semibold text-txt-3"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
               </div>
 
               <ProductIconPicker
