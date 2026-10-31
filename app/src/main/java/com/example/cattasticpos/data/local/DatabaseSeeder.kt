@@ -56,7 +56,8 @@ internal object DatabaseSeeder {
                     cashiersJson = AppConfigEntity.DEFAULT_CASHIERS_JSON,
                     supabaseUrl = "https://hyeotyohpdpmmvquotnd.supabase.co",
                     supabaseAnonKey = "sb_publishable_orak9Nk7HGB_qFHgXMdIzA_11T8NfYQ",
-                    deviceId = java.util.UUID.randomUUID().toString()
+                    deviceId = java.util.UUID.randomUUID().toString(),
+                    catalogVersion = MenuContentUpdater.CURRENT_CATALOG_VERSION
                 )
             )
         } catch (e: Exception) {

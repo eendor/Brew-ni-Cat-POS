@@ -19,6 +19,9 @@ interface MenuDao {
     @Query("SELECT COUNT(*) FROM categories")
     suspend fun getCategoryCount(): Int
 
+    @Query("SELECT * FROM categories WHERE id = :categoryId LIMIT 1")
+    suspend fun getCategoryById(categoryId: String): CategoryEntity?
+
     @Query("SELECT * FROM items WHERE id = :itemId LIMIT 1")
     suspend fun getItemById(itemId: String): ItemEntity?
 

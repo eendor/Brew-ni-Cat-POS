@@ -37,7 +37,7 @@ import kotlinx.coroutines.launch
         AppConfigEntity::class,
         VoidRecordEntity::class
     ],
-    version = 19,
+    version = 20,
     exportSchema = false
 )
 abstract class PosDatabase : RoomDatabase() {
@@ -91,7 +91,8 @@ abstract class PosDatabase : RoomDatabase() {
                     MIGRATION_15_16,
                     MIGRATION_16_17,
                     MIGRATION_17_18,
-                    MIGRATION_18_19
+                    MIGRATION_18_19,
+                    MIGRATION_19_20
                 )
                 .addCallback(PosDatabaseCallback(appContext, scope))
                 .addCallback(MigrationSuccessCallback(appContext))
@@ -217,6 +218,14 @@ abstract class PosDatabase : RoomDatabase() {
                 AddOnSurchargeRepair.run(db)
             }
         }
+
+        val MIGRATION_19_20 = object : androidx.room.migration.Migration(19, 20) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE items ADD COLUMN isAvailable INTEGER NOT NULL DEFAULT 1")
+                db.execSQL("ALTER TABLE items ADD COLUMN icon TEXT")
+                db.execSQL("ALTER TABLE app_config ADD COLUMN catalogVersion INTEGER NOT NULL DEFAULT 0")
+            }
+        }
     }
 
     private class MigrationSuccessCallback(
@@ -253,7 +262,8 @@ abstract class PosDatabase : RoomDatabase() {
                     MenuContentUpdater.applyPendingUpdates(
                         database.menuDao(),
                         database.inventoryDao(),
-                        database.recipeDao()
+                        database.recipeDao(),
+                        database.appConfigDao()
                     )
                     com.example.cattasticpos.worker.SyncWorker.triggerImmediateSync(appContext)
                 }

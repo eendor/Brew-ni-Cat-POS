@@ -63,6 +63,42 @@ class SyncWorker(
                 request
             )
         }
+
+        suspend fun deleteRemoteCatalogRow(context: Context, table: String, id: String) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                try {
+                    val app = context.applicationContext as? CattasticPosApp ?: return@withContext
+                    val config = app.container.database.appConfigDao().getAppConfigOnce() ?: return@withContext
+                    val supabaseUrl = config.supabaseUrl.trim()
+                    val supabaseKey = config.supabaseAnonKey.trim()
+                    if (supabaseUrl.isEmpty() || supabaseKey.isEmpty()) return@withContext
+                    val accessToken = app.container.supabaseAuthManager.getValidAccessToken() ?: return@withContext
+                    val encodedId = java.net.URLEncoder.encode(id, "UTF-8")
+                    val deleteClient = OkHttpClient.Builder()
+                        .connectTimeout(10, TimeUnit.SECONDS)
+                        .readTimeout(10, TimeUnit.SECONDS)
+                        .build()
+                    if (table == "items") {
+                        val recipeDeleteReq = Request.Builder()
+                            .url("$supabaseUrl/rest/v1/recipe_mappings?menu_item_id=eq.$encodedId")
+                            .delete()
+                            .header("apikey", supabaseKey)
+                            .header("Authorization", "Bearer $accessToken")
+                            .build()
+                        deleteClient.newCall(recipeDeleteReq).execute().close()
+                    }
+                    val deleteReq = Request.Builder()
+                        .url("$supabaseUrl/rest/v1/$table?id=eq.$encodedId")
+                        .delete()
+                        .header("apikey", supabaseKey)
+                        .header("Authorization", "Bearer $accessToken")
+                        .build()
+                    deleteClient.newCall(deleteReq).execute().close()
+                } catch (e: Exception) {
+                    Log.w(TAG, "Remote delete from $table ($id) skipped or failed", e)
+                }
+            }
+        }
     }
 
     private val client = OkHttpClient.Builder()
@@ -96,7 +132,32 @@ class SyncWorker(
         return try {
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
-                    Log.e(TAG, "Upload to $table failed: ${response.code} - ${response.body?.string().orEmpty()}")
+                    val errorBody = response.body?.string().orEmpty()
+                    if (table == "items" && response.code == 400 && errorBody.contains("icon")) {
+                        val strippedPayload = JSONArray()
+                        for (i in 0 until payload.length()) {
+                            val copy = JSONObject(payload.getJSONObject(i).toString())
+                            copy.remove("icon")
+                            strippedPayload.put(copy)
+                        }
+                        val fallbackReq = Request.Builder()
+                            .url("$supabaseUrl/rest/v1/$table")
+                            .post(strippedPayload.toString().toRequestBody(JSON_MEDIA_TYPE))
+                            .header("apikey", supabaseKey)
+                            .header("Authorization", "Bearer $accessToken")
+                            .header("Prefer", "resolution=merge-duplicates")
+                            .header("Content-Type", "application/json")
+                            .build()
+                        return client.newCall(fallbackReq).execute().use { fallbackRes ->
+                            if (!fallbackRes.isSuccessful) {
+                                Log.e(TAG, "Upload to $table fallback failed: ${fallbackRes.code} - ${fallbackRes.body?.string().orEmpty()}")
+                                false
+                            } else {
+                                true
+                            }
+                        }
+                    }
+                    Log.e(TAG, "Upload to $table failed: ${response.code} - $errorBody")
                     false
                 } else {
                     true
@@ -218,7 +279,8 @@ class SyncWorker(
                             put("name", item.name)
                             put("flavors", item.flavors)
                             put("variants_json", item.variantsJson)
-                            put("is_available", true)
+                            put("is_available", item.isAvailable)
+                            put("icon", item.icon ?: JSONObject.NULL)
                         }
                     )
                 }
@@ -342,7 +404,19 @@ class SyncWorker(
                                 val name = obj.getString("name")
                                 val flavors = obj.optString("flavors", "")
                                 val variantsJson = obj.optString("variants_json", "[]")
-                                downloadedList.add(com.example.cattasticpos.data.local.entity.ItemEntity(id, categoryId, name, flavors, variantsJson))
+                                val isAvailable = obj.optBoolean("is_available", true)
+                                val icon = if (obj.isNull("icon")) null else obj.optString("icon", "").takeIf { it.isNotBlank() }
+                                downloadedList.add(
+                                    com.example.cattasticpos.data.local.entity.ItemEntity(
+                                        id = id,
+                                        categoryId = categoryId,
+                                        name = name,
+                                        flavors = flavors,
+                                        variantsJson = variantsJson,
+                                        isAvailable = isAvailable,
+                                        icon = icon
+                                    )
+                                )
                                 downloadedIds.add(id)
                             }
                             if (downloadedList.isNotEmpty()) {

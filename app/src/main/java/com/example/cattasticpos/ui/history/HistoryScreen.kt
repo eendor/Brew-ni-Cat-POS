@@ -81,6 +81,7 @@ import java.util.*
 fun HistoryScreen(
     viewModel: HistoryViewModel,
     onNavigateBack: () -> Unit,
+    onNavigateToMenuEditor: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val orders by viewModel.ordersState.collectAsStateWithLifecycle()
@@ -134,6 +135,14 @@ fun HistoryScreen(
             }
         },
         actions = {
+            IconButton(onClick = onNavigateToMenuEditor) {
+                FluentIcon(
+                    imageVector = FluentIcons.Utensils,
+                    contentDescription = "Edit Menu & Categories",
+                    tint = cupertino.accent,
+                    size = 24.dp
+                )
+            }
             IconButton(onClick = { viewModel.setShowDateRangeDialog(true) }) {
                 FluentIcon(
                     imageVector = FluentIcons.Calendar,

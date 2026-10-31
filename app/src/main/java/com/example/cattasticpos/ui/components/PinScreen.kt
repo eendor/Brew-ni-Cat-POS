@@ -58,6 +58,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 fun PinScreen(
     onPinSuccess: () -> Unit,
     onCancel: () -> Unit,
+    subtitle: String = "Enter your PIN to view order history",
     pinGateViewModel: PinGateViewModel = viewModel(factory = PinGateViewModel.Factory)
 ) {
     var pin by remember { mutableStateOf("") }
@@ -116,7 +117,7 @@ fun PinScreen(
                 textAlign = TextAlign.Center
             )
             Text(
-                text = "Enter your PIN to view order history",
+                text = subtitle,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
