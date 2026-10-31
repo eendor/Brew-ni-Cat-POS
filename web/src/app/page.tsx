@@ -33,8 +33,10 @@ import {
   Info,
   Flame,
   Sun,
-  Moon
+  Moon,
+  Settings
 } from 'lucide-react';
+import { ShopSettingsTab } from '@/components/shop-settings-tab';
 
 // Interfaces mapping the database tables
 interface OrderItem {
@@ -210,7 +212,7 @@ export default function Page() {
 }
 
 function Dashboard() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'history' | 'expenses' | 'menu' | 'inventory'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'history' | 'expenses' | 'menu' | 'inventory' | 'settings'>('dashboard');
   const [orders, setOrders] = useState<Order[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -1103,6 +1105,17 @@ function Dashboard() {
               <Package className="w-4 h-4" />
               Aggregated Stock
             </button>
+            <button
+              onClick={() => setActiveTab('settings')}
+              className={`flex items-center gap-3.5 px-4.5 py-3 rounded-2xl text-sm font-medium transition-all ${
+                activeTab === 'settings'
+                  ? 'bg-surface-3 text-emerald-400 border border-hair shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]'
+                  : 'text-txt-2 hover:bg-surface-2 hover:text-txt-1 border border-transparent'
+              }`}
+            >
+              <Settings className="w-4 h-4" />
+              Shop Settings
+            </button>
           </nav>
         </div>
 
@@ -1159,6 +1172,7 @@ function Dashboard() {
               {activeTab === 'expenses' && '💸 Expense Audit Log'}
               {activeTab === 'menu' && '🍔 Menu Catalog Editor'}
               {activeTab === 'inventory' && '📦 Aggregated Inventory & Stock'}
+              {activeTab === 'settings' && '⚙️ Shop Settings'}
             </h2>
             <span className="hidden sm:inline text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.1)] uppercase tracking-wider">
               Online
@@ -2105,6 +2119,14 @@ function Dashboard() {
                 </div>
               </div>
             )}
+
+            {activeTab === 'settings' && (
+              <ShopSettingsTab
+                supabase={supabase}
+                menuItems={menuItems}
+                onMenuItemsChanged={fetchMenuItems}
+              />
+            )}
           </div>
         )}
       </main>
@@ -2410,6 +2432,7 @@ function Dashboard() {
           { id: 'expenses', label: 'Expenses', Icon: DollarSign },
           { id: 'menu', label: 'Menu', Icon: Layers },
           { id: 'inventory', label: 'Stock', Icon: Package },
+          { id: 'settings', label: 'Settings', Icon: Settings },
         ] as const).map(({ id, label, Icon }) => (
           <button
             key={id}
