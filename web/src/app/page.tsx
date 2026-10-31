@@ -37,6 +37,14 @@ import {
   Settings
 } from 'lucide-react';
 import { ShopSettingsTab } from '@/components/shop-settings-tab';
+import { ProductIcon, ProductIconPicker } from '@/components/product-icon';
+import {
+  getProductIconLabel,
+  normalizeProductIconKey,
+  resolveDefaultProductIconKey,
+  resolveEffectiveProductIconKey,
+  stripIconColumnIfUnsupported,
+} from '@/lib/product-icons';
 
 // Interfaces mapping the database tables
 interface OrderItem {
@@ -84,6 +92,7 @@ interface MenuItem {
   flavors: string;
   variants_json: string; // JSON string containing Variant[]
   is_available: boolean;
+  icon?: string | null;
   created_at?: string;
 }
 
@@ -257,6 +266,7 @@ function Dashboard() {
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [itemName, setItemName] = useState('');
   const [itemCategory, setItemCategory] = useState('');
+  const [itemIcon, setItemIcon] = useState<string | null>(null);
   const [itemFlavors, setItemFlavors] = useState('');
   const [itemVariants, setItemVariants] = useState<Variant[]>([
     { id: 'regular', name: 'Regular', basePrice: 0, priceByFlavor: {} }
@@ -851,10 +861,18 @@ function Dashboard() {
       name: itemName.trim(),
       flavors: flavorsList.join('|'),
       variants_json: JSON.stringify(normalizedVariants),
-      is_available: editingItem ? editingItem.is_available : true
+      is_available: editingItem ? editingItem.is_available : true,
+      icon: normalizeProductIconKey(itemIcon),
     };
 
-    const { error } = await supabase.from('items').upsert(payload);
+    let { error } = await supabase.from('items').upsert(payload);
+    if (error) {
+      const retry = stripIconColumnIfUnsupported(payload, error);
+      if (retry.shouldRetry) {
+        const fallbackResult = await supabase.from('items').upsert(retry.fallbackPayload);
+        error = fallbackResult.error;
+      }
+    }
     if (error) {
       console.error(error);
       alert('Error saving item: ' + error.message);
@@ -869,6 +887,7 @@ function Dashboard() {
     setEditingItem(item);
     setItemName(item.name);
     setItemCategory(item.category_id);
+    setItemIcon(normalizeProductIconKey(item.icon));
     setItemFlavors(item.flavors.split('|').join(', '));
     try {
       const parsed = JSON.parse(item.variants_json) as Variant[];
@@ -1954,6 +1973,7 @@ function Dashboard() {
                           setEditingItem(null);
                           setItemName('');
                           setItemCategory(categories[0]?.id || '');
+                          setItemIcon(null);
                           setItemFlavors('');
                           setItemVariants([{ id: 'regular', name: 'Regular', basePrice: 0, priceByFlavor: {} }]);
                           setPerFlavorPricing(false);
@@ -2004,6 +2024,8 @@ function Dashboard() {
                         const categoryName = categories.find(c => c.id === item.category_id)?.name || 'Default';
                         const startingPrice = getStartingPrice(item.variants_json);
                         const isLowStock = checkIsItemLowStock(item.id);
+                        const effectiveIconKey = resolveEffectiveProductIconKey(item);
+                        const customIconLabel = getProductIconLabel(item.icon);
 
                         return (
                           <div
@@ -2019,8 +2041,15 @@ function Dashboard() {
 
                             {/* Item Icon Badge (Matches app top left badge) */}
                             <div className="flex items-center justify-between">
-                              <div className="w-10 h-10 rounded-2xl bg-surface-2 border border-hair flex items-center justify-center">
-                                {getCategoryIcon(item.category_id)}
+                              <div className="flex items-center gap-2">
+                                <div className="w-10 h-10 rounded-2xl bg-surface-2 border border-hair flex items-center justify-center">
+                                  <ProductIcon iconKey={effectiveIconKey} className="w-5 h-5 text-emerald-400" />
+                                </div>
+                                {customIconLabel && (
+                                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-surface-2 border border-hair text-txt-3">
+                                    {customIconLabel}
+                                  </span>
+                                )}
                               </div>
                               <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${item.is_available ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400' : 'bg-red-500/10 border border-red-500/20 text-red-400'}`}>
                                 {item.is_available ? 'Active' : 'Unavailable'}
@@ -2288,6 +2317,12 @@ function Dashboard() {
                   ))}
                 </select>
               </div>
+
+              <ProductIconPicker
+                value={itemIcon}
+                defaultIconKey={resolveDefaultProductIconKey(editingItem?.id || '', itemCategory)}
+                onChange={setItemIcon}
+              />
 
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] font-bold uppercase tracking-wider text-txt-3">Flavors (comma separated)</label>
