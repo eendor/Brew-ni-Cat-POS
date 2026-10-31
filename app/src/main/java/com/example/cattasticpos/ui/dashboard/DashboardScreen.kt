@@ -1615,6 +1615,8 @@ fun ProductConfigBottomSheet(item: Item, onDismiss: () -> Unit, onAddToCart: (Va
         mutableStateOf<Variant?>(if (item.variants.size == 1) item.variants.firstOrNull() else null)
     }
     var selectedFlavor by remember(item.id) { mutableStateOf<String?>(null) }
+    var mixMode by remember(item.id) { mutableStateOf(false) }
+    var mixPicks by remember(item.id) { mutableStateOf<List<String>>(emptyList()) }
     var selectedCoffeeOption by remember(item.id) { mutableStateOf<String?>(null) }
     // Optional extras stay unselected until the cashier taps them. Take-out Box is no longer
     // among them — it is its own menu item under the Take-out Box category.
@@ -1712,6 +1714,16 @@ fun ProductConfigBottomSheet(item: Item, onDismiss: () -> Unit, onAddToCart: (Va
                             } else {
                                 item.flavors
                             }
+                            val continueWith: (String?) -> Unit = { picked ->
+                                selectedFlavor = picked
+                                selectedVariant = if (item.variants.size == 1) item.variants.firstOrNull() else null
+                                currentStep = when {
+                                    item.variants.size > 1 -> ProductConfigStep.Size
+                                    isCoffee -> ProductConfigStep.CoffeeOption
+                                    hasAddOns -> ProductConfigStep.AddOns
+                                    else -> ProductConfigStep.Size
+                                }
+                            }
                             ProductConfigStepHeader(
                                 title = item.name,
                                 subtitle = selectedFlavorGroup ?: "Choose a flavor",
@@ -1733,16 +1745,17 @@ fun ProductConfigBottomSheet(item: Item, onDismiss: () -> Unit, onAddToCart: (Va
                                     key(flavor) {
                                         FlavorOptionRow(
                                             label = flavor.substringAfter(": ").trim(),
-                                            isSelected = selectedFlavor == flavor,
+                                            isSelected = if (mixMode) flavor in mixPicks else selectedFlavor == flavor,
                                             leadingIcon = FluentIcons.menuItemIcon(item.id, item.icon),
                                             onSelect = {
-                                                selectedFlavor = flavor
-                                                selectedVariant = if (item.variants.size == 1) item.variants.firstOrNull() else null
-                                                currentStep = when {
-                                                    item.variants.size > 1 -> ProductConfigStep.Size
-                                                    isCoffee -> ProductConfigStep.CoffeeOption
-                                                    hasAddOns -> ProductConfigStep.AddOns
-                                                    else -> ProductConfigStep.Size
+                                                if (mixMode) {
+                                                    mixPicks = when {
+                                                        flavor in mixPicks -> mixPicks - flavor
+                                                        mixPicks.size < CartLineSelection.MAX_MIXED_FLAVORS -> mixPicks + flavor
+                                                        else -> mixPicks.drop(1) + flavor
+                                                    }
+                                                } else {
+                                                    continueWith(flavor)
                                                 }
                                             }
                                         )
@@ -1750,8 +1763,35 @@ fun ProductConfigBottomSheet(item: Item, onDismiss: () -> Unit, onAddToCart: (Va
                                 }
                             }
                             Spacer(modifier = Modifier.height(12.dp))
+                            if (flavorsForStep.size > 1) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            mixMode = !mixMode
+                                            mixPicks = emptyList()
+                                        },
+                                        modifier = Modifier.heightIn(min = 44.dp)
+                                    ) {
+                                        Text(if (mixMode) "Single flavor" else "Mix ${CartLineSelection.MAX_MIXED_FLAVORS} flavors")
+                                    }
+                                    if (mixMode) {
+                                        Button(
+                                            onClick = { continueWith(CartLineSelection.mixFlavors(mixPicks)) },
+                                            enabled = mixPicks.size == CartLineSelection.MAX_MIXED_FLAVORS,
+                                            modifier = Modifier.heightIn(min = 44.dp)
+                                        ) {
+                                            Text("Continue (${mixPicks.size}/${CartLineSelection.MAX_MIXED_FLAVORS})")
+                                        }
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                            }
                             Text(
-                                text = "Tap a flavor to continue",
+                                text = if (mixMode) "Pick ${CartLineSelection.MAX_MIXED_FLAVORS} flavors, same price as the size" else "Tap a flavor to continue",
                                 modifier = Modifier.fillMaxWidth(),
                                 fontSize = 12.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,

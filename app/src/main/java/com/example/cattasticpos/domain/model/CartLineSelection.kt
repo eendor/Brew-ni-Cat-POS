@@ -35,6 +35,23 @@ data class CartLineSelection(
     }
 
     companion object {
+        /** Joins the flavors of a mixed order, e.g. "BBQ Scratch / Cheesy Purr". */
+        const val MIX_SEPARATOR = " / "
+
+        /** Any product with flavors can mix up to this many, at the normal size price. */
+        const val MAX_MIXED_FLAVORS = 2
+
+        /** The flavors in a base flavor string: one entry, or each part of a mix. */
+        fun mixParts(baseFlavor: String?): List<String> =
+            baseFlavor.orEmpty().split(MIX_SEPARATOR).map { it.trim() }.filter { it.isNotEmpty() }
+
+        /** Builds the stored base flavor for one or more picked flavors. */
+        fun mixFlavors(flavors: List<String>): String? = when (flavors.size) {
+            0 -> null
+            1 -> flavors.first()
+            else -> flavors.joinToString(MIX_SEPARATOR) { it.substringAfter(": ").trim() }
+        }
+
         private const val COFFEE_SEPARATOR = " — "
         private const val ADD_ON_SEPARATOR = " + "
         private const val ADD_ON_PREFIX = "+ "
