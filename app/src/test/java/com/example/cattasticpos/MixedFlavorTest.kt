@@ -1,10 +1,13 @@
 package com.example.cattasticpos
 
+import com.example.cattasticpos.domain.catalog.ProductAddOnCatalog
 import com.example.cattasticpos.domain.model.CartLineSelection
 import com.example.cattasticpos.domain.model.RecipeMapping
 import com.example.cattasticpos.domain.model.Variant
 import com.example.cattasticpos.domain.usecase.RecipeDeductionResolver
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** Mixed flavors (TC-P4-252 to TC-P4-254): two flavors on one line at the size price. */
@@ -37,5 +40,14 @@ class MixedFlavorTest {
         val sour = RecipeMapping("m3", "item_fries", "Sour Cream", "inv_sour", 1.0)
         val result = RecipeDeductionResolver.resolve(listOf(bbq, cheese, sour), "Medium", "BBQ Scratch / Cheesy Purr")
         assertEquals(setOf("m1", "m2"), result.map { it.id }.toSet())
+    }
+
+    @Test
+    fun `mixing is offered on fries only`() {
+        // TC-P4-257
+        assertTrue(ProductAddOnCatalog.allowsFlavorMix("bite_fries", "Fries (Cat Claws)"))
+        assertFalse(ProductAddOnCatalog.allowsFlavorMix("bite_takoyaki", "Takoyaki (Pawsome Balls)"))
+        assertFalse(ProductAddOnCatalog.allowsFlavorMix("drink_soda", "Soda (Fizzy Felines)"))
+        assertFalse(ProductAddOnCatalog.allowsFlavorMix("sedaap_spicy_chicken", "Sedaap Spicy Chicken"))
     }
 }

@@ -38,7 +38,7 @@ data class CartLineSelection(
         /** Joins the flavors of a mixed order, e.g. "BBQ Scratch / Cheesy Purr". */
         const val MIX_SEPARATOR = " / "
 
-        /** Any product with flavors can mix up to this many, at the normal size price. */
+        /** Fries can mix up to this many flavors, at the normal size price (see ProductAddOnCatalog.allowsFlavorMix). */
         const val MAX_MIXED_FLAVORS = 2
 
         /** The flavors in a base flavor string: one entry, or each part of a mix. */

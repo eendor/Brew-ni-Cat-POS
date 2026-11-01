@@ -66,6 +66,12 @@ object ProductAddOnCatalog {
         }
     }
 
+    /** Mixing 2 flavors is offered on fries only for now (same rule as the website). */
+    fun allowsFlavorMix(itemId: String, itemName: String? = null): Boolean =
+        itemId.lowercase().contains("fries") || itemName?.lowercase()?.contains("fries") == true
+
+    fun allowsFlavorMix(item: Item): Boolean = allowsFlavorMix(item.id, item.name)
+
     fun addOnsForItem(item: Item): List<AddOnOption> =
         addOnsForItem(item.id, item.categoryId, item.name)
 
