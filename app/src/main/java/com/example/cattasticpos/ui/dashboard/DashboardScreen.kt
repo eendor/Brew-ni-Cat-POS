@@ -119,6 +119,8 @@ fun DashboardScreen(
     viewModel: DashboardViewModel,
     onNavigateToHistory: () -> Unit,
     onNavigateToInventory: () -> Unit,
+    onNavigateToOnlineOrders: () -> Unit = {},
+    newOnlineOrderCount: Int = 0,
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -191,6 +193,24 @@ fun DashboardScreen(
                 contentDescription = "Search menu",
                 tint = cupertino.accent
             )
+            BadgedBox(
+                badge = {
+                    if (newOnlineOrderCount > 0) {
+                        Badge { Text(if (newOnlineOrderCount > 9) "9+" else newOnlineOrderCount.toString()) }
+                    }
+                }
+            ) {
+                DashboardHeaderIconButton(
+                    onClick = onNavigateToOnlineOrders,
+                    icon = FluentIcons.Bell,
+                    contentDescription = if (newOnlineOrderCount > 0) {
+                        "Online orders, $newOnlineOrderCount new"
+                    } else {
+                        "Online orders"
+                    },
+                    tint = cupertino.accent
+                )
+            }
             DashboardHeaderIconButton(
                 onClick = onNavigateToInventory,
                 icon = FluentIcons.Box,

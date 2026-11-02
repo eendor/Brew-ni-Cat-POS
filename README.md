@@ -46,7 +46,7 @@ The register runs on a Redmi Pad 2 in the shop. Updates ship over the air: the a
 
 ## Screens
 
-Four screens behind a launcher activity — deliberately flat, because speed at the counter beats navigation depth.
+Five screens behind a launcher activity — deliberately flat, because speed at the counter beats navigation depth.
 
 | Screen | Purpose |
 |---|---|
@@ -54,6 +54,7 @@ Four screens behind a launcher activity — deliberately flat, because speed at 
 | **History** | **PIN-protected.** Paged order log with date-range filter, swipe-to-reveal share/edit/void, expense timeline, cashier breakdown, the per-item **Food & Drink Totals** breakdown (per day / week / month), and the Z-Reading summary + print. |
 | **Inventory** | Raw materials, stock levels, reorder thresholds, and the recipe (BOM) editor mapping menu variants and flavors to ingredient deductions. |
 | **Menu & Categories** | **PIN-protected.** Add, edit, or delete menu categories and products, pick from 30 product icons, configure sizes and per-flavor prices, and toggle item availability (`Available` / `Sold Out`). |
+| **Online Orders** | Orders customers place on the website, live through Realtime with a chime and a badge on the dashboard bell. Staff **Accept** or **Reject** (with a reason the customer sees), then **Start preparing**, **Mark ready** and **Complete**, or **Cancel** after accepting. Completing adds one POS sale in the database and takes the order's ingredients off this tablet's stock, once per order. A change that gets no answer stays on the card with **Retry**. |
 
 Three overlays sit above them:
 

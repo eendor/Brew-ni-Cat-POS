@@ -171,8 +171,42 @@ class SupabaseRealtimeManager(private val context: Context) {
             }
             webSocket.send(joinMessage.toString())
             Log.i(TAG, "Sent join channel message.")
+            joinOnlineOrders(webSocket, accessToken)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to join realtime channel", e)
+        }
+    }
+
+    /**
+     * Online orders ride the same socket on their own channel (FR-080). Row-level security lets
+     * the store account see every order, so a new one reaches the tablet the moment it's placed.
+     */
+    private fun joinOnlineOrders(webSocket: WebSocket, accessToken: String) {
+        try {
+            val joinMessage = JSONObject().apply {
+                put("topic", "realtime:public:online_orders")
+                put("event", "phx_join")
+                put("payload", JSONObject().apply {
+                    put("access_token", accessToken)
+                    put("config", JSONObject().apply {
+                        put("postgres_changes", JSONArray().apply {
+                            for (change in listOf("INSERT", "UPDATE")) {
+                                put(JSONObject().apply {
+                                    put("event", change)
+                                    put("schema", "public")
+                                    put("table", "online_orders")
+                                })
+                            }
+                        })
+                    })
+                })
+                put("ref", (refCount++).toString())
+            }
+            webSocket.send(joinMessage.toString())
+            // The screen reads the list again after a reconnect, in case orders came in meanwhile.
+            OnlineOrderEvents.notifyChanged()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to join the online orders channel", e)
         }
     }
 
@@ -185,6 +219,10 @@ class SupabaseRealtimeManager(private val context: Context) {
 
                 val payload = json.optJSONObject("payload") ?: return@launch
                 val data = payload.optJSONObject("data") ?: return@launch
+                if (data.optString("table") == "online_orders") {
+                    OnlineOrderEvents.notifyChanged()
+                    return@launch
+                }
                 val type = data.optString("type") // "INSERT" or "UPDATE"
                 val record = data.optJSONObject("record") ?: return@launch
 

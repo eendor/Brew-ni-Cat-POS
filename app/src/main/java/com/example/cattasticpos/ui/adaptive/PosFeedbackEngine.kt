@@ -25,7 +25,8 @@ enum class PosSound {
     Success,
     Error,
     AddToCart,
-    Checkout
+    Checkout,
+    NewOrder
 }
 
 data class FeedbackEvent(
@@ -56,6 +57,7 @@ class PosFeedbackController(
         soundIds[PosSound.Error] = soundPool.load(context, R.raw.pos_error, 1)
         soundIds[PosSound.AddToCart] = soundPool.load(context, R.raw.pos_add_cart, 1)
         soundIds[PosSound.Checkout] = soundPool.load(context, R.raw.pos_checkout, 1)
+        soundIds[PosSound.NewOrder] = soundPool.load(context, R.raw.pos_new_order, 1)
     }
 
     fun perform(
@@ -68,7 +70,9 @@ class PosFeedbackController(
         if (preferences.soundsEnabled) {
             event.sound?.let { sound ->
                 soundIds[sound]?.let { id ->
-                    soundPool.play(id, 0.35f, 0.35f, 1, 0, 1f)
+                    // a new online order has to be heard across the counter; taps stay quiet
+                    val volume = if (sound == PosSound.NewOrder) 0.9f else 0.35f
+                    soundPool.play(id, volume, volume, 1, 0, 1f)
                 }
             }
         }

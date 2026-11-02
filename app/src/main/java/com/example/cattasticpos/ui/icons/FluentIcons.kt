@@ -10,6 +10,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.ArrowLeft
+import com.composables.icons.lucide.Bell
+import com.composables.icons.lucide.RefreshCw
 import com.composables.icons.lucide.CakeSlice
 import com.composables.icons.lucide.Calendar
 import com.composables.icons.lucide.Candy
@@ -107,6 +109,8 @@ object FluentIcons {
     val Tag: ImageVector = Lucide.Tag
     val Percent: ImageVector = Lucide.Percent
     val ShoppingBag: ImageVector = Lucide.ShoppingBag
+    val Bell: ImageVector = Lucide.Bell
+    val Refresh: ImageVector = Lucide.RefreshCw
     val Utensils: ImageVector = Lucide.Utensils
 
     val DrinkCoffee: ImageVector = Lucide.Coffee
