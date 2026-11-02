@@ -30,6 +30,8 @@ import com.example.cattasticpos.ui.inventory.InventoryScreen
 import com.example.cattasticpos.ui.inventory.InventoryViewModel
 import com.example.cattasticpos.ui.menu.MenuEditorScreen
 import com.example.cattasticpos.ui.menu.MenuEditorViewModel
+import com.example.cattasticpos.ui.orders.OnlineOrdersScreen
+import com.example.cattasticpos.ui.orders.OnlineOrdersViewModel
 import com.example.cattasticpos.ui.components.PinScreen
 import com.example.cattasticpos.ui.components.AppUpdateGate
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -127,6 +129,14 @@ class MainActivity : ComponentActivity() {
                     val historyViewModel: HistoryViewModel = viewModel(factory = HistoryViewModel.Factory)
                     val inventoryViewModel: InventoryViewModel = viewModel(factory = InventoryViewModel.Factory)
                     val menuEditorViewModel: MenuEditorViewModel = viewModel(factory = MenuEditorViewModel.Factory)
+                    // Lives with this screen so the dashboard badge and the chime work on every screen
+                    val onlineOrdersViewModel: OnlineOrdersViewModel = viewModel(factory = OnlineOrdersViewModel.Factory)
+                    val onlineOrdersState by onlineOrdersViewModel.uiState.collectAsStateWithLifecycle()
+                    LaunchedEffect(onlineOrdersViewModel) {
+                        onlineOrdersViewModel.newOrderAlerts.collect {
+                            performFeedback(FeedbackEvent(BionicHaptic.Success, PosSound.NewOrder))
+                        }
+                    }
 
                     ParallaxNavHost(
                         targetScreen = currentScreen,
@@ -137,7 +147,15 @@ class MainActivity : ComponentActivity() {
                                 DashboardScreen(
                                     viewModel = dashboardViewModel,
                                     onNavigateToHistory = { navigateTo("pin_history") },
-                                    onNavigateToInventory = { navigateTo("inventory") }
+                                    onNavigateToInventory = { navigateTo("inventory") },
+                                    onNavigateToOnlineOrders = { navigateTo("online_orders") },
+                                    newOnlineOrderCount = onlineOrdersState.newCount
+                                )
+                            }
+                            "online_orders" -> {
+                                OnlineOrdersScreen(
+                                    viewModel = onlineOrdersViewModel,
+                                    onNavigateBack = { navigateTo("dashboard") }
                                 )
                             }
                             "pin_history" -> {
