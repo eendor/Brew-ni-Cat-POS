@@ -1545,7 +1545,7 @@ fun PaymentCheckoutDialog(
                         selected = isSplit,
                         onClick = { onPaymentStateChange(paymentState.copy(selectedTabIndex = 2)) },
                         label = "Split",
-                        icon = FluentIcons.Wallet,
+                        icon = FluentIcons.Split,
                         modifier = Modifier.weight(1f)
                     )
                 }
