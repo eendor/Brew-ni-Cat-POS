@@ -203,6 +203,8 @@ fun OnlineOrdersScreen(
                             change = state.changes[order.reference],
                             onStep = { to -> viewModel.change(order, to) },
                             onEnd = { to -> reasonFor = order to to },
+                            canUndo = order.reference in state.undoable,
+                            onUndo = { viewModel.undo(order) },
                             onRetry = { viewModel.retry(order.reference) },
                             onDismiss = { viewModel.dismiss(order.reference) }
                         )
@@ -278,6 +280,8 @@ private fun OrderCard(
     change: PendingChange?,
     onStep: (OnlineOrderStatus) -> Unit,
     onEnd: (OnlineOrderStatus) -> Unit,
+    canUndo: Boolean,
+    onUndo: () -> Unit,
     onRetry: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -343,6 +347,12 @@ private fun OrderCard(
                 Text(peso(order.subtotal), fontWeight = FontWeight.Bold, fontSize = 18.sp)
             }
             OrderActions(order, change, onStep, onEnd, onRetry, onDismiss)
+            if (change == null && canUndo) {
+                // FR-095: a mistaken tap can be taken back for 5 minutes
+                TextButton(onClick = onUndo, modifier = Modifier.align(Alignment.End)) {
+                    Text("Undo ${order.status.label}")
+                }
+            }
         }
     }
 }
@@ -360,12 +370,12 @@ private fun OrderActions(
         if (change.isSending) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                Text("Saving: ${change.to.label}…", style = MaterialTheme.typography.bodyMedium)
+                Text("Saving: ${change.label}…", style = MaterialTheme.typography.bodyMedium)
             }
         } else {
             // A change with no answer stays here until it lands or staff give up (FR-077)
             ErrorBanner(
-                message = "${change.to.label} wasn't saved. ${change.failure}",
+                message = "${change.label} wasn't saved. ${change.failure}",
                 actionLabel = "Retry",
                 onAction = onRetry
             )

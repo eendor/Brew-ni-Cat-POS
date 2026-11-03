@@ -93,6 +93,19 @@ object OnlineOrderRules {
      * (ADR-021). A rejected or cancelled order never changes stock.
      */
     fun deductsStock(to: OnlineOrderStatus): Boolean = to == OnlineOrderStatus.Completed
+
+    /** How long after a change staff can still undo it; the database checks the same limit. */
+    const val UNDO_WINDOW_MILLIS = 5 * 60_000L
+
+    /**
+     * Whether the card offers Undo: the last change is under five minutes old and was a step
+     * forward. A new order has nothing to undo, and a rejection can't be undone because the
+     * customer has already seen the reason. The database has the last word (FR-095).
+     */
+    fun canUndo(order: OnlineOrder, nowMillis: Long): Boolean =
+        order.status != OnlineOrderStatus.Pending &&
+            order.status != OnlineOrderStatus.Rejected &&
+            nowMillis - order.updatedAtMillis in 0..UNDO_WINDOW_MILLIS
 }
 
 /** What the database said to a status change. */
@@ -101,7 +114,9 @@ sealed interface OnlineOrderChangeResult {
     data class Changed(
         val reference: String,
         val status: OnlineOrderStatus,
-        val replayed: Boolean
+        val replayed: Boolean,
+        /** The POS sale the database voided when a Complete was undone. */
+        val voidedSaleId: Long? = null
     ) : OnlineOrderChangeResult
 
     /** The database refused: `stale`, `not_allowed`, `reason_required`, `invalid` or `not_found`. */

@@ -24,6 +24,7 @@ import com.example.cattasticpos.domain.repository.OnlineOrdersRepository
 import com.example.cattasticpos.domain.repository.RecipeRepository
 import com.example.cattasticpos.domain.usecase.DeductOnlineOrderStockUseCase
 import com.example.cattasticpos.domain.usecase.DeductedOrderStore
+import com.example.cattasticpos.domain.usecase.LocalSaleStore
 import com.example.cattasticpos.ui.orders.OnlineOrdersCoordinator
 import com.example.cattasticpos.ui.orders.endingStep
 import com.example.cattasticpos.ui.orders.primaryStep
@@ -75,6 +76,22 @@ class OnlineOrdersTest {
             }
             return answer
         }
+
+        val undoCalls = mutableListOf<Pair<String, OnlineOrderStatus>>()
+        val undoAnswers = ArrayDeque<OnlineOrderChangeResult>()
+
+        override suspend fun undoStatus(
+            reference: String,
+            from: OnlineOrderStatus,
+            correlationId: String
+        ): OnlineOrderChangeResult {
+            undoCalls += reference to from
+            val answer = undoAnswers.removeFirst()
+            if (answer is OnlineOrderChangeResult.Changed) {
+                orders = orders.map { if (it.reference == reference) it.copy(status = answer.status) else it }
+            }
+            return answer
+        }
     }
 
     private class FakeMenu(private val items: List<Item>) : MenuRepository {
@@ -108,13 +125,21 @@ class OnlineOrdersTest {
         override suspend fun decrementStock(inventoryId: String, amount: Double) {
             stock[inventoryId] = (stock[inventoryId] ?: 0.0) - amount
         }
-        override suspend fun restockItem(itemId: String, addedAmount: Double) = Unit
+        override suspend fun restockItem(itemId: String, addedAmount: Double) {
+            stock[itemId] = (stock[itemId] ?: 0.0) + addedAmount
+        }
         override suspend fun deleteInventoryItem(itemId: String) = Unit
     }
 
     private class MemoryStore : DeductedOrderStore {
         private val done = mutableSetOf<String>()
         override fun claim(reference: String) = done.add(reference)
+        override fun release(reference: String) = done.remove(reference)
+    }
+
+    private class FakeSales(val voided: MutableSet<Long> = mutableSetOf()) : LocalSaleStore {
+        override suspend fun markVoided(remoteId: Long) = voided.add(remoteId)
+        override suspend fun isVoided(remoteId: Long) = remoteId in voided
     }
 
     private val matcha = Item(
@@ -141,10 +166,12 @@ class OnlineOrdersTest {
     private class Rig(
         val orders: FakeOrders,
         val inventory: FakeInventory,
-        val coordinator: OnlineOrdersCoordinator
+        val coordinator: OnlineOrdersCoordinator,
+        val sales: FakeSales
     )
 
     private fun rig(vararg initial: OnlineOrder): Rig {
+        val sales = FakeSales()
         val orders = FakeOrders(initial.toList())
         val inventory = FakeInventory()
         val deduct = DeductOnlineOrderStockUseCase(
@@ -163,10 +190,11 @@ class OnlineOrdersTest {
             scope = CoroutineScope(Dispatchers.Unconfined),
             repository = orders,
             deductStock = deduct,
+            localSales = sales,
             newCorrelationId = { "corr-${++next}" },
             now = { 5_000L }
         )
-        return Rig(orders, inventory, coordinator)
+        return Rig(orders, inventory, coordinator, sales)
     }
 
     // ---- status rules --------------------------------------------------------------------
@@ -367,6 +395,68 @@ class OnlineOrdersTest {
         assertEquals(2, r.coordinator.state.value.orders.size)
         assertEquals("offline", r.coordinator.state.value.loadError)
         job.cancel()
+    }
+
+    // ---- undo (FR-095) ------------------------------------------------------------------
+
+    @Test
+    fun `TC-P6-205 Undo shows for five minutes after a step forward, never for new or rejected orders`() {
+        val recent = order("BNC-AAAAAA", Accepted).copy(updatedAtMillis = 4_000L)
+        val old = order("BNC-BBBBBB", Ready).copy(updatedAtMillis = 5_000L - OnlineOrderRules.UNDO_WINDOW_MILLIS - 1)
+        val fresh = order("BNC-CCCCCC", Pending).copy(updatedAtMillis = 4_000L)
+        val rejected = order("BNC-DDDDDD", Rejected).copy(updatedAtMillis = 4_000L)
+        val r = rig(recent, old, fresh, rejected)
+        r.coordinator.refresh()
+        assertEquals(setOf("BNC-AAAAAA"), r.coordinator.state.value.undoable)
+
+        r.coordinator.undo(old)
+        assertTrue(r.orders.undoCalls.isEmpty())
+        assertEquals("This change can't be undone any more.", r.coordinator.state.value.snackbarMessage)
+    }
+
+    @Test
+    fun `TC-P6-206 undoing a Complete voids the local sale and puts the stock back once`() {
+        val done = order("BNC-AAAAAA", Ready).copy(updatedAtMillis = 4_000L)
+        val r = rig(done)
+        r.coordinator.refresh()
+        r.coordinator.change(done, Completed)
+        assertEquals(98.0, r.inventory.stock["cups"]!!, 0.0)
+
+        r.orders.orders = r.orders.orders.map { it.copy(updatedAtMillis = 4_500L) }
+        r.coordinator.refresh()
+        r.orders.undoAnswers += OnlineOrderChangeResult.Changed("BNC-AAAAAA", Ready, replayed = false, voidedSaleId = 2_000_000_000_000_001L)
+        r.coordinator.undo(r.orders.orders.single())
+        assertEquals(listOf("BNC-AAAAAA" to Completed), r.orders.undoCalls)
+        assertEquals(100.0, r.inventory.stock["cups"]!!, 0.0)
+        assertEquals(50.0, r.inventory.stock["matcha"]!!, 0.0)
+        assertTrue(2_000_000_000_000_001L in r.sales.voided)
+        // the undone order offers no second Undo
+        assertFalse("BNC-AAAAAA" in r.coordinator.state.value.undoable)
+
+        // completing it again takes the stock off again
+        r.coordinator.change(r.orders.orders.single(), Completed)
+        assertEquals(98.0, r.inventory.stock["cups"]!!, 0.0)
+    }
+
+    @Test
+    fun `TC-P6-207 no double restock when a sync already voided the sale, and a refused undo is explained`() {
+        val done = order("BNC-AAAAAA", Ready).copy(updatedAtMillis = 4_000L)
+        val r = rig(done)
+        r.coordinator.refresh()
+        r.coordinator.change(done, Completed)
+        r.sales.voided += 7L // a live sync voided the copy and restocked already
+        r.coordinator.refresh()
+        r.orders.undoAnswers += OnlineOrderChangeResult.Changed("BNC-AAAAAA", Ready, replayed = false, voidedSaleId = 7L)
+        r.coordinator.undo(r.orders.orders.single())
+        assertEquals(98.0, r.inventory.stock["cups"]!!, 0.0)
+
+        val other = order("BNC-BBBBBB", Preparing).copy(updatedAtMillis = 4_000L)
+        val r2 = rig(other)
+        r2.coordinator.refresh()
+        r2.orders.undoAnswers += OnlineOrderChangeResult.Refused("too_late", Preparing)
+        r2.coordinator.undo(other)
+        assertEquals("A change can only be undone within 5 minutes.", r2.coordinator.state.value.snackbarMessage)
+        assertNull(r2.coordinator.state.value.changes["BNC-BBBBBB"])
     }
 
     private fun <T> CoroutineScope.launchCollect(flow: kotlinx.coroutines.flow.SharedFlow<T>, onEach: (T) -> Unit) =

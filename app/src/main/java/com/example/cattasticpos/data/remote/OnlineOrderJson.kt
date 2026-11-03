@@ -64,7 +64,12 @@ object OnlineOrderJson {
             return OnlineOrderChangeResult.Changed(
                 reference = json.optString("reference"),
                 status = status ?: return OnlineOrderChangeResult.Failed("The server's answer was not understood."),
-                replayed = json.optBoolean("replayed")
+                replayed = json.optBoolean("replayed"),
+                voidedSaleId = if (json.has("voidedSaleId") && !json.isNull("voidedSaleId")) {
+                    json.getLong("voidedSaleId")
+                } else {
+                    null
+                }
             )
         }
         return OnlineOrderChangeResult.Refused(
@@ -80,6 +85,7 @@ object OnlineOrderJson {
         "not_allowed" -> "That step isn't allowed from this status."
         "reason_required" -> "Tell the customer why the order is rejected."
         "not_found" -> "This order can't be found any more."
+        "too_late" -> "A change can only be undone within 5 minutes."
         else -> "The change was refused."
     }
 

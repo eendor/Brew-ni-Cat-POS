@@ -14,6 +14,22 @@ import kotlinx.coroutines.flow.first
 interface DeductedOrderStore {
     /** True the first time a reference is claimed on this tablet, false every time after. */
     fun claim(reference: String): Boolean
+
+    /** Forgets a claim after an undone Complete. True when the reference was claimed. */
+    fun release(reference: String): Boolean
+}
+
+/** This tablet's copy of the POS sales. */
+interface LocalSaleStore {
+    /**
+     * Marks the local copy of a cloud sale voided, without touching stock, so the next sync
+     * doesn't put the stock back a second time.
+     * @return false when the copy was already voided (a sync got there first) or isn't here yet.
+     */
+    suspend fun markVoided(remoteId: Long): Boolean
+
+    /** True when this tablet has a copy of the sale and it is already voided. */
+    suspend fun isVoided(remoteId: Long): Boolean
 }
 
 /**
@@ -34,7 +50,28 @@ class DeductOnlineOrderStockUseCase(
     /** @return true when stock was taken off now, false when this order was already done. */
     suspend operator fun invoke(order: OnlineOrder): Boolean {
         if (!store.claim(order.reference)) return false
+        forEachAmount(order) { inventoryId, amount -> inventoryRepository.decrementStock(inventoryId, amount) }
+        return true
+    }
 
+    /**
+     * Puts back the stock of an undone Complete (FR-095) and forgets the claim, so completing the
+     * order again takes the stock off again. The tablet's copy of the voided sale is marked first;
+     * if a sync already voided it, that sync put the stock back and nothing more is added.
+     * @return true when stock was put back now.
+     */
+    suspend fun restore(order: OnlineOrder, voidedSaleId: Long?, sales: LocalSaleStore?): Boolean {
+        if (voidedSaleId != null && sales != null && sales.isVoided(voidedSaleId)) {
+            store.release(order.reference)
+            return false
+        }
+        if (voidedSaleId != null && sales != null) sales.markVoided(voidedSaleId)
+        if (!store.release(order.reference)) return false
+        forEachAmount(order) { inventoryId, amount -> inventoryRepository.restockItem(inventoryId, amount) }
+        return true
+    }
+
+    private suspend fun forEachAmount(order: OnlineOrder, apply: suspend (String, Double) -> Unit) {
         val menu = menuRepository.getItems().first()
         val cartItems = toCartItems(order, menu)
         val mappingsByMenu = recipeRepository.getAllMappingsOnce().groupBy { it.menuItemId }
@@ -47,11 +84,10 @@ class DeductOnlineOrderStockUseCase(
                 )
                 mappings.forEach { mapping ->
                     val amount = mapping.deductionQuantity * component.quantity
-                    if (amount > 0) inventoryRepository.decrementStock(mapping.inventoryItemId, amount)
+                    if (amount > 0) apply(mapping.inventoryItemId, amount)
                 }
             }
         }
-        return true
     }
 
     private fun toCartItems(order: OnlineOrder, menu: List<Item>): List<CartItem> {

@@ -19,4 +19,14 @@ interface OnlineOrdersRepository {
         reason: String?,
         correlationId: String
     ): OnlineOrderChangeResult
+
+    /**
+     * Asks the database to undo the order's last change, made from [from]. Undoing a Complete
+     * voids its sale. The same [correlationId] on a retry answers `replayed` (FR-095).
+     */
+    suspend fun undoStatus(
+        reference: String,
+        from: OnlineOrderStatus,
+        correlationId: String
+    ): OnlineOrderChangeResult
 }

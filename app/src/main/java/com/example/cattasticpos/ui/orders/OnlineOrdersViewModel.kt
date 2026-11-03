@@ -6,11 +6,13 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.example.cattasticpos.CattasticPosApp
 import com.example.cattasticpos.data.local.DeductedOrderPreferences
+import com.example.cattasticpos.data.local.RoomLocalSaleStore
 import com.example.cattasticpos.data.repository.OnlineOrdersRepositoryImpl
 import com.example.cattasticpos.domain.model.OnlineOrder
 import com.example.cattasticpos.domain.model.OnlineOrderStatus
 import com.example.cattasticpos.domain.repository.OnlineOrdersRepository
 import com.example.cattasticpos.domain.usecase.DeductOnlineOrderStockUseCase
+import com.example.cattasticpos.domain.usecase.LocalSaleStore
 import com.example.cattasticpos.service.OnlineOrderEvents
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.debounce
@@ -24,10 +26,11 @@ import kotlinx.coroutines.launch
  */
 class OnlineOrdersViewModel(
     repository: OnlineOrdersRepository,
-    deductStock: DeductOnlineOrderStockUseCase
+    deductStock: DeductOnlineOrderStockUseCase,
+    localSales: LocalSaleStore? = null
 ) : ViewModel() {
 
-    private val coordinator = OnlineOrdersCoordinator(viewModelScope, repository, deductStock)
+    private val coordinator = OnlineOrdersCoordinator(viewModelScope, repository, deductStock, localSales)
 
     val uiState = coordinator.state
     val newOrderAlerts = coordinator.newOrderAlerts
@@ -52,6 +55,7 @@ class OnlineOrdersViewModel(
     fun refresh() = coordinator.refresh()
     fun change(order: OnlineOrder, to: OnlineOrderStatus, reason: String? = null) =
         coordinator.change(order, to, reason)
+    fun undo(order: OnlineOrder) = coordinator.undo(order)
     fun retry(reference: String) = coordinator.retry(reference)
     fun dismiss(reference: String) = coordinator.dismiss(reference)
     fun clearSnackbar() = coordinator.clearSnackbar()
@@ -74,7 +78,8 @@ class OnlineOrdersViewModel(
                         recipeRepository = container.recipeRepository,
                         inventoryRepository = container.inventoryRepository,
                         store = DeductedOrderPreferences(app)
-                    )
+                    ),
+                    localSales = RoomLocalSaleStore(container.database.orderDao())
                 ) as T
             }
         }
