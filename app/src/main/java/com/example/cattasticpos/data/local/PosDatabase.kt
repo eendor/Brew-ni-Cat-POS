@@ -37,7 +37,7 @@ import kotlinx.coroutines.launch
         AppConfigEntity::class,
         VoidRecordEntity::class
     ],
-    version = 20,
+    version = 21,
     exportSchema = false
 )
 abstract class PosDatabase : RoomDatabase() {
@@ -92,7 +92,8 @@ abstract class PosDatabase : RoomDatabase() {
                     MIGRATION_16_17,
                     MIGRATION_17_18,
                     MIGRATION_18_19,
-                    MIGRATION_19_20
+                    MIGRATION_19_20,
+                    MIGRATION_20_21
                 )
                 .addCallback(PosDatabaseCallback(appContext, scope))
                 .addCallback(MigrationSuccessCallback(appContext))
@@ -224,6 +225,19 @@ abstract class PosDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE items ADD COLUMN isAvailable INTEGER NOT NULL DEFAULT 1")
                 db.execSQL("ALTER TABLE items ADD COLUMN icon TEXT")
                 db.execSQL("ALTER TABLE app_config ADD COLUMN catalogVersion INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        /** Sale the owner gave for free; it was already removed from the shared database. */
+        internal const val REMOVED_FREE_SALE_REMOTE_ID = 2000000000000002L
+
+        // Deletes only the local copy of that sale. Voiding it instead would put its stock back,
+        // and the stock was really used. No schema change; the bump makes it run once per device.
+        val MIGRATION_20_21 = object : androidx.room.migration.Migration(20, 21) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                val id = REMOVED_FREE_SALE_REMOTE_ID
+                db.execSQL("DELETE FROM order_items WHERE orderId IN (SELECT id FROM orders WHERE remoteId = $id)")
+                db.execSQL("DELETE FROM orders WHERE remoteId = $id")
             }
         }
     }
