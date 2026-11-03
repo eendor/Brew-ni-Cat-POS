@@ -25,6 +25,8 @@ enum class OrderServiceType {
 data class PaymentDialogState(
     val selectedTabIndex: Int = 0,
     val amountTenderedStr: String = "",
+    /** Split tab (FR-096): the GCash part; the cash part is the rest of the total. */
+    val splitGcashStr: String = "",
     val gcashReference: String = "",
     val receivingAccount: String = "",
     val serviceType: OrderServiceType = OrderServiceType.DINE_IN,

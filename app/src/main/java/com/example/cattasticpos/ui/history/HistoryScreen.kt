@@ -1,5 +1,6 @@
 package com.example.cattasticpos.ui.history
 
+import com.example.cattasticpos.domain.model.SplitPayment
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.Animatable
@@ -1201,6 +1202,8 @@ private fun OrderHistoryCardContent(
                 Column(horizontalAlignment = Alignment.End) {
                     val badgeColor = if (order.paymentMethod == "GCASH") {
                         MaterialTheme.colorScheme.tertiary
+                    } else if (order.paymentMethod == SplitPayment.METHOD) {
+                        MaterialTheme.colorScheme.secondary
                     } else {
                         MaterialTheme.colorScheme.primary
                     }
@@ -1210,7 +1213,7 @@ private fun OrderHistoryCardContent(
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
                         Text(
-                            text = order.paymentMethod,
+                            text = if (order.paymentMethod == SplitPayment.METHOD) "CASH + GCASH" else order.paymentMethod,
                             color = MaterialTheme.colorScheme.onPrimary,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold
