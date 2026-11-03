@@ -1383,6 +1383,7 @@ fun PaymentCheckoutDialog(
     AdaptiveGlassDialog(
         onDismissRequest = { if (!isProcessing) onDismiss() },
         surfaceAlpha = 0.93f,
+        scrollContent = true,
         title = {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1439,6 +1440,42 @@ fun PaymentCheckoutDialog(
             }
         },
         content = {
+            // GCash SIM and reference: after the GCash part on the Split tab, alone on the GCash tab.
+            val gcashFields: @Composable () -> Unit = {
+                Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    ExposedDropdownMenuBox(expanded = simDropdownExpanded, onExpandedChange = { simDropdownExpanded = it }) {
+                        OutlinedTextField(
+                            value = paymentState.receivingAccount,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Receiving SIM") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = simDropdownExpanded) },
+                            colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
+                            modifier = Modifier.menuAnchor().fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        ExposedDropdownMenu(expanded = simDropdownExpanded, onDismissRequest = { simDropdownExpanded = false }) {
+                            simOptions.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option) },
+                                    onClick = {
+                                        onPaymentStateChange(paymentState.copy(receivingAccount = option))
+                                        simDropdownExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    OutlinedTextField(
+                        value = paymentState.gcashReference,
+                        onValueChange = { onPaymentStateChange(paymentState.copy(gcashReference = it)) },
+                        label = { Text("GCash Reference No. (Optional)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                }
+            }
             Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text(
                     "Order Type",
@@ -1482,7 +1519,7 @@ fun PaymentCheckoutDialog(
                     )
                 }
                 Text(
-                    "Total Due",
+                    "Payment Method",
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -1523,13 +1560,17 @@ fun PaymentCheckoutDialog(
                         isError = paymentState.splitGcashStr.isNotBlank() && !splitValid,
                         supportingText = {
                             Text(
-                                if (splitValid) "Cash part: ₱${String.format("%.2f", splitCash)}"
-                                else "Enter a GCash amount above ₱0 and below ₱${String.format("%.0f", finalTotal)}"
+                                when {
+                                    splitValid -> "Cash part: ₱${String.format("%.2f", splitCash)}"
+                                    paymentState.splitGcashStr.isBlank() -> "The rest of ₱${String.format("%.0f", finalTotal)} is paid in cash"
+                                    else -> "Enter an amount above ₱0 and below ₱${String.format("%.0f", finalTotal)}"
+                                }
                             )
                         },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
                     )
+                    gcashFields()
                 }
                 if (isCash || isSplit) {
                     OutlinedTextField(
@@ -1580,43 +1621,17 @@ fun PaymentCheckoutDialog(
                             Text(
                                 if (changeDue >= 0) "₱${String.format("%.0f", changeDue)}" else "---",
                                 fontWeight = FontWeight.Bold,
-                                color = if (changeDue >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                                color = when {
+                                    changeDue >= 0 -> MaterialTheme.colorScheme.primary
+                                    paymentState.amountTenderedStr.isBlank() -> MaterialTheme.colorScheme.onSurfaceVariant
+                                    else -> MaterialTheme.colorScheme.error
+                                }
                             )
                         }
                     }
                 }
-                if (!isCash) {
-                    ExposedDropdownMenuBox(expanded = simDropdownExpanded, onExpandedChange = { simDropdownExpanded = it }) {
-                        OutlinedTextField(
-                            value = paymentState.receivingAccount,
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { Text("Receiving SIM") },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = simDropdownExpanded) },
-                            colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
-                            modifier = Modifier.menuAnchor().fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
-                        )
-                        ExposedDropdownMenu(expanded = simDropdownExpanded, onDismissRequest = { simDropdownExpanded = false }) {
-                            simOptions.forEach { option ->
-                                DropdownMenuItem(
-                                    text = { Text(option) },
-                                    onClick = {
-                                        onPaymentStateChange(paymentState.copy(receivingAccount = option))
-                                        simDropdownExpanded = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-                    OutlinedTextField(
-                        value = paymentState.gcashReference,
-                        onValueChange = { onPaymentStateChange(paymentState.copy(gcashReference = it)) },
-                        label = { Text("GCash Reference No. (Optional)") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
-                    )
+                if (!isCash && !isSplit) {
+                    gcashFields()
                 }
             }
         }
