@@ -120,10 +120,12 @@ interface OrderDao {
     @Query("SELECT SUM(total) FROM orders WHERE timestamp >= :startOfDay AND timestamp <= :endOfDay AND isVoided = 0")
     fun getNetRevenueForDay(startOfDay: Long, endOfDay: Long): Flow<Double?>
 
-    @Query("SELECT SUM(total) FROM orders WHERE timestamp >= :startOfDay AND timestamp <= :endOfDay AND paymentMethod = 'CASH' AND isVoided = 0")
+    // A SPLIT sale counts its cash part here and the rest under GCash (FR-096). Its payment
+    // reference starts with "cash=<amount>|", see SplitPayment.
+    @Query("SELECT SUM(CASE WHEN paymentMethod = 'SPLIT' THEN CAST(substr(paymentReference, 6, instr(paymentReference, '|') - 6) AS REAL) ELSE total END) FROM orders WHERE timestamp >= :startOfDay AND timestamp <= :endOfDay AND paymentMethod IN ('CASH', 'SPLIT') AND isVoided = 0")
     fun getCashSalesForDay(startOfDay: Long, endOfDay: Long): Flow<Double?>
 
-    @Query("SELECT SUM(total) FROM orders WHERE timestamp >= :startOfDay AND timestamp <= :endOfDay AND paymentMethod = 'GCASH' AND isVoided = 0")
+    @Query("SELECT SUM(CASE WHEN paymentMethod = 'SPLIT' THEN total - CAST(substr(paymentReference, 6, instr(paymentReference, '|') - 6) AS REAL) ELSE total END) FROM orders WHERE timestamp >= :startOfDay AND timestamp <= :endOfDay AND paymentMethod IN ('GCASH', 'SPLIT') AND isVoided = 0")
     fun getGcashSalesForDay(startOfDay: Long, endOfDay: Long): Flow<Double?>
 
     @Query(

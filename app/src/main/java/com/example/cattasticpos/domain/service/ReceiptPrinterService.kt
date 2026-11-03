@@ -1,5 +1,6 @@
 package com.example.cattasticpos.domain.service
 
+import com.example.cattasticpos.domain.model.SplitPayment
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
@@ -117,7 +118,7 @@ class ReceiptPrinterService(private val context: Context) {
             outputStream.write(boldOff)
         }
         outputStream.write("Order: #${order.receiptNumber}\n".toByteArray())
-        outputStream.write("Payment: ${order.paymentMethod}\n".toByteArray())
+        outputStream.write("Payment: ${SplitPayment.describe(order.paymentMethod, order.paymentReference).replace("₱", "PHP ")}\n".toByteArray())
         outputStream.write("--------------------------------\n".toByteArray())
 
         outputStream.write(alignLeft)

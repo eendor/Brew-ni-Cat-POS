@@ -1,5 +1,6 @@
 package com.example.cattasticpos.ui.dashboard
 
+import com.example.cattasticpos.domain.model.SplitPayment
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -1366,9 +1367,18 @@ fun PaymentCheckoutDialog(
     val simOptions = gcashAccounts.map { it.label }
 
     val amountTendered = paymentState.amountTenderedStr.toDoubleOrNull() ?: 0.0
-    val changeDue = amountTendered - finalTotal
     val isCash = paymentState.selectedTabIndex == 0
-    val isReady = if (isCash) amountTendered >= finalTotal else paymentState.receivingAccount.isNotBlank()
+    val isSplit = paymentState.selectedTabIndex == 2
+    val splitGcash = paymentState.splitGcashStr.toDoubleOrNull() ?: 0.0
+    val splitCash = finalTotal - splitGcash
+    val splitValid = SplitPayment.isValid(finalTotal, splitCash, splitGcash)
+    val cashDue = if (isSplit) splitCash else finalTotal
+    val changeDue = amountTendered - cashDue
+    val isReady = when {
+        isCash -> amountTendered >= finalTotal
+        isSplit -> splitValid && amountTendered >= splitCash && paymentState.receivingAccount.isNotBlank()
+        else -> paymentState.receivingAccount.isNotBlank()
+    }
 
     AdaptiveGlassDialog(
         onDismissRequest = { if (!isProcessing) onDismiss() },
@@ -1396,6 +1406,11 @@ fun PaymentCheckoutDialog(
                 onClick = {
                     if (isCash) {
                         onConfirmPayment("CASH", null)
+                    } else if (isSplit) {
+                        onConfirmPayment(
+                            SplitPayment.METHOD,
+                            SplitPayment.encode(splitCash, splitGcash, paymentState.receivingAccount, paymentState.gcashReference)
+                        )
                     } else {
                         val ref = buildString {
                             append("account=${paymentState.receivingAccount}")
@@ -1489,12 +1504,38 @@ fun PaymentCheckoutDialog(
                         icon = FluentIcons.Receipt,
                         modifier = Modifier.weight(1f)
                     )
+                    CupertinoSegmentChip(
+                        selected = isSplit,
+                        onClick = { onPaymentStateChange(paymentState.copy(selectedTabIndex = 2)) },
+                        label = "Split",
+                        icon = FluentIcons.Wallet,
+                        modifier = Modifier.weight(1f)
+                    )
                 }
-                if (isCash) {
+                if (isSplit) {
+                    // FR-096: part GCash, the rest in cash. Both parts count under their own method.
+                    OutlinedTextField(
+                        value = paymentState.splitGcashStr,
+                        onValueChange = { onPaymentStateChange(paymentState.copy(splitGcashStr = it)) },
+                        label = { Text("GCash part (₱)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        isError = paymentState.splitGcashStr.isNotBlank() && !splitValid,
+                        supportingText = {
+                            Text(
+                                if (splitValid) "Cash part: ₱${String.format("%.2f", splitCash)}"
+                                else "Enter a GCash amount above ₱0 and below ₱${String.format("%.0f", finalTotal)}"
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                }
+                if (isCash || isSplit) {
                     OutlinedTextField(
                         value = paymentState.amountTenderedStr,
                         onValueChange = { onPaymentStateChange(paymentState.copy(amountTenderedStr = it)) },
-                        label = { Text("Amount Tendered (₱)") },
+                        label = { Text(if (isSplit) "Cash Tendered (₱)" else "Amount Tendered (₱)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
@@ -1510,7 +1551,7 @@ fun PaymentCheckoutDialog(
                             label = "Exact",
                             onClick = {
                                 onPaymentStateChange(
-                                    paymentState.copy(amountTenderedStr = String.format("%.0f", finalTotal))
+                                    paymentState.copy(amountTenderedStr = String.format("%.0f", kotlin.math.ceil(cashDue)))
                                 )
                             },
                             modifier = Modifier.weight(1.2f)
@@ -1543,7 +1584,8 @@ fun PaymentCheckoutDialog(
                             )
                         }
                     }
-                } else {
+                }
+                if (!isCash) {
                     ExposedDropdownMenuBox(expanded = simDropdownExpanded, onExpandedChange = { simDropdownExpanded = it }) {
                         OutlinedTextField(
                             value = paymentState.receivingAccount,

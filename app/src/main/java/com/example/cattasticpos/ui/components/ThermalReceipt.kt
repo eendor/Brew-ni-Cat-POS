@@ -1,5 +1,6 @@
 package com.example.cattasticpos.ui.components
 
+import com.example.cattasticpos.domain.model.SplitPayment
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -46,7 +47,7 @@ fun formatReceiptShareText(order: Order): String {
         add(RECEIPT_DIVIDER)
         add("Order #${order.receiptNumber}")
         add("Date: $dateStr")
-        add("Payment: ${order.paymentMethod}")
+        add("Payment: ${SplitPayment.describe(order.paymentMethod, order.paymentReference)}")
         if (!order.tableLabel.isNullOrBlank()) {
             add("Name: ${order.tableLabel}")
         }
@@ -123,7 +124,7 @@ fun ThermalReceiptCard(
         ReceiptDivider(mono, ink)
         ReceiptMetaLine("Order #", order.receiptNumber, mono, ink)
         ReceiptMetaLine("Date", dateStr, mono, ink)
-        ReceiptMetaLine("Payment", order.paymentMethod, mono, ink)
+        ReceiptMetaLine("Payment", SplitPayment.describe(order.paymentMethod, order.paymentReference), mono, ink)
         ReceiptDivider(mono, ink)
 
         order.items.forEach { item ->
