@@ -403,6 +403,8 @@ fun AdaptiveGlassDialog(
     fixedFooter: Boolean = false,
     contentMaxHeight: Dp = 480.dp,
     contentPadding: Dp = 24.dp,
+    /** Lets tall content scroll so the buttons stay on screen; for content with no scrolling list of its own. */
+    scrollContent: Boolean = false,
     content: @Composable ColumnScope.() -> Unit
 ) {
     val textColor = adaptiveGlassContentColor()
@@ -466,7 +468,18 @@ fun AdaptiveGlassDialog(
                             confirmButton?.invoke()
                         }
                     } else {
-                        content()
+                        if (scrollContent) {
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f, fill = false)
+                                    .fillMaxWidth()
+                                    .verticalScroll(rememberScrollState())
+                            ) {
+                                content()
+                            }
+                        } else {
+                            content()
+                        }
                         if (hasFooter) {
                             Spacer(modifier = Modifier.height(20.dp))
                             Row(
