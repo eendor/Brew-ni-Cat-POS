@@ -28,6 +28,16 @@
 
 ---
 
+## Part of Brew ni Cat Connect
+
+This app is the POS part of the **Brew ni Cat Connect** project ([eendor/Brew-ni-Cat-Connect](https://github.com/eendor/Brew-ni-Cat-Connect)), the shop's website and online ordering system. The two share one Supabase database:
+
+- Website orders appear on the tablet's **Online orders** screen, and staff move them through Accepted, Preparing, Ready and Completed (FR-075 to FR-080).
+- Completing an online order records the sale here and takes its ingredients off the stock (ADR-021).
+- Staff can undo a mistaken status change within 5 minutes (FR-095), and take one sale partly in cash and partly by GCash (FR-096).
+
+Requirements, test cases, decisions and the development log for the POS work live in the Connect repository's `docs/` folder. POS pull requests link to the matching Connect pull request.
+
 ## What it is
 
 A single-store POS built to keep selling when the internet does not. Every order is written to a local Room database first and pushed to Supabase in the background, so a dropped connection never blocks a sale. When two devices are online — the counter tablet and the owner's phone — orders, voids, stock and expenses reconcile between them within seconds.
