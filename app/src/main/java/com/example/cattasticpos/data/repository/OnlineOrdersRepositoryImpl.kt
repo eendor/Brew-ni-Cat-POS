@@ -19,8 +19,9 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Reads online orders and changes their status through Supabase with the signed-in store
- * account. The table has no write access: `public.set_online_order_status()` is the only way to
- * change an order, and it also adds the status history row and the audit row.
+ * account. The table has no write access: `public.set_online_order_status()` and
+ * `public.undo_online_order_status()` are the only ways to change an order, and they also add the
+ * status history row and the audit row.
  */
 class OnlineOrdersRepositoryImpl(
     private val appConfigDao: AppConfigDao,
@@ -68,40 +69,58 @@ class OnlineOrdersRepositoryImpl(
         to: OnlineOrderStatus,
         reason: String?,
         correlationId: String
-    ): OnlineOrderChangeResult = withContext(Dispatchers.IO) {
-        try {
-            val (url, key) = config()
-                ?: return@withContext OnlineOrderChangeResult.Failed("Cloud sync is not set up on this device.")
-            val token = authManager.getValidAccessToken()
-                ?: return@withContext OnlineOrderChangeResult.Failed("Sign in with the store account first.")
-            val payload = JSONObject().apply {
-                put("p_reference", reference)
-                put("p_from_status", from.wire)
-                put("p_to_status", to.wire)
-                put("p_reason", reason?.trim()?.takeIf { it.isNotEmpty() } ?: JSONObject.NULL)
-                put("p_correlation_id", correlationId)
-            }
-            val request = Request.Builder()
-                .url("$url/rest/v1/rpc/set_online_order_status")
-                .post(payload.toString().toRequestBody(JSON))
-                .header("apikey", key)
-                .header("Authorization", "Bearer $token")
-                .header("Content-Type", "application/json")
-                .build()
-            client.newCall(request).execute().use { response ->
-                val body = response.body?.string().orEmpty()
-                when {
-                    response.isSuccessful -> OnlineOrderJson.parseChange(body)
-                    response.code == 401 || response.code == 403 ->
-                        OnlineOrderChangeResult.Failed("This account can't change online orders. Sign in with the store account.")
-                    else -> OnlineOrderChangeResult.Failed("The server didn't save the change (${response.code}). Try again.")
-                }
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "changeStatus: ${e.message}")
-            OnlineOrderChangeResult.Failed("Couldn't reach the server. Check the internet connection and try again.")
+    ): OnlineOrderChangeResult = rpc(
+        "set_online_order_status",
+        JSONObject().apply {
+            put("p_reference", reference)
+            put("p_from_status", from.wire)
+            put("p_to_status", to.wire)
+            put("p_reason", reason?.trim()?.takeIf { it.isNotEmpty() } ?: JSONObject.NULL)
+            put("p_correlation_id", correlationId)
         }
-    }
+    )
+
+    override suspend fun undoStatus(
+        reference: String,
+        from: OnlineOrderStatus,
+        correlationId: String
+    ): OnlineOrderChangeResult = rpc(
+        "undo_online_order_status",
+        JSONObject().apply {
+            put("p_reference", reference)
+            put("p_from_status", from.wire)
+            put("p_correlation_id", correlationId)
+        }
+    )
+
+    private suspend fun rpc(function: String, payload: JSONObject): OnlineOrderChangeResult =
+        withContext(Dispatchers.IO) {
+            try {
+                val (url, key) = config()
+                    ?: return@withContext OnlineOrderChangeResult.Failed("Cloud sync is not set up on this device.")
+                val token = authManager.getValidAccessToken()
+                    ?: return@withContext OnlineOrderChangeResult.Failed("Sign in with the store account first.")
+                val request = Request.Builder()
+                    .url("$url/rest/v1/rpc/$function")
+                    .post(payload.toString().toRequestBody(JSON))
+                    .header("apikey", key)
+                    .header("Authorization", "Bearer $token")
+                    .header("Content-Type", "application/json")
+                    .build()
+                client.newCall(request).execute().use { response ->
+                    val body = response.body?.string().orEmpty()
+                    when {
+                        response.isSuccessful -> OnlineOrderJson.parseChange(body)
+                        response.code == 401 || response.code == 403 ->
+                            OnlineOrderChangeResult.Failed("This account can't change online orders. Sign in with the store account.")
+                        else -> OnlineOrderChangeResult.Failed("The server didn't save the change (${response.code}). Try again.")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "$function: ${e.message}")
+                OnlineOrderChangeResult.Failed("Couldn't reach the server. Check the internet connection and try again.")
+            }
+        }
 
     private suspend fun config(): Pair<String, String>? {
         val config = appConfigDao.getAppConfigOnce() ?: return null

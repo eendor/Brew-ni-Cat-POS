@@ -15,6 +15,13 @@ class DeductedOrderPreferences(context: Context) : DeductedOrderStore {
         return prefs.edit().putStringSet(KEY, done + reference).commit()
     }
 
+    @Synchronized
+    override fun release(reference: String): Boolean {
+        val done = prefs.getStringSet(KEY, emptySet()).orEmpty()
+        if (reference !in done) return false
+        return prefs.edit().putStringSet(KEY, done - reference).commit()
+    }
+
     private companion object {
         const val KEY = "deducted_references"
     }

@@ -6,6 +6,7 @@ import com.example.cattasticpos.domain.model.OnlineOrderRules
 import com.example.cattasticpos.domain.model.OnlineOrderStatus
 import com.example.cattasticpos.domain.repository.OnlineOrdersRepository
 import com.example.cattasticpos.domain.usecase.DeductOnlineOrderStockUseCase
+import com.example.cattasticpos.domain.usecase.LocalSaleStore
 import com.example.cattasticpos.data.remote.OnlineOrderJson
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -28,8 +29,13 @@ data class PendingChange(
     /** Kept across retries so the database can tell a retry from a second change. */
     val correlationId: String,
     /** Null while it is being sent, the reason it didn't land once it failed. */
-    val failure: String? = null
+    val failure: String? = null,
+    /** An undo of the last change; [to] is then the status being undone (FR-095). */
+    val undo: Boolean = false
 ) {
+    /** What the card says while this change is saving or after it failed. */
+    val label: String get() = if (undo) "Undo ${to.label}" else to.label
+
     val isSending: Boolean get() = failure == null
 }
 
@@ -40,7 +46,9 @@ data class OnlineOrdersUiState(
     val lastLoadedAtMillis: Long? = null,
     /** Changes sending or failed, by order reference. A failed one stays until retried or dismissed. */
     val changes: Map<String, PendingChange> = emptyMap(),
-    val snackbarMessage: String? = null
+    val snackbarMessage: String? = null,
+    /** Orders whose last change can still be undone, by reference (FR-095). */
+    val undoable: Set<String> = emptySet()
 ) {
     /** Orders waiting for staff to accept or reject them. */
     val newCount: Int get() = orders.count { it.status == OnlineOrderStatus.Pending }
@@ -61,6 +69,7 @@ class OnlineOrdersCoordinator(
     private val scope: CoroutineScope,
     private val repository: OnlineOrdersRepository,
     private val deductStock: DeductOnlineOrderStockUseCase,
+    private val localSales: LocalSaleStore? = null,
     private val newCorrelationId: () -> String = { UUID.randomUUID().toString() },
     private val now: () -> Long = System::currentTimeMillis
 ) {
@@ -75,6 +84,9 @@ class OnlineOrdersCoordinator(
     private val refreshLock = Mutex()
     private val announced = mutableSetOf<String>()
 
+    /** Orders undone on this tablet: an undo can't be undone, so they offer no Undo until moved on. */
+    private val undone = mutableMapOf<String, OnlineOrderStatus>()
+
     fun refresh() {
         scope.launch { load() }
     }
@@ -85,8 +97,19 @@ class OnlineOrdersCoordinator(
                 val fresh = orders.filter {
                     it.status == OnlineOrderStatus.Pending && announced.add(it.reference)
                 }
+                val time = now()
+                // A forward step after the undo makes the order undoable again.
+                undone.entries.removeAll { (reference, status) ->
+                    orders.none { it.reference == reference && it.status == status }
+                }
+                val undoable = orders.filter {
+                    OnlineOrderRules.canUndo(it, time) && it.reference !in undone
+                }.map { it.reference }.toSet()
                 _state.update {
-                    it.copy(orders = orders, isLoading = false, loadError = null, lastLoadedAtMillis = now())
+                    it.copy(
+                        orders = orders, isLoading = false, loadError = null,
+                        lastLoadedAtMillis = time, undoable = undoable
+                    )
                 }
                 if (fresh.isNotEmpty()) _newOrderAlerts.tryEmit(fresh.size)
             }
@@ -115,6 +138,16 @@ class OnlineOrdersCoordinator(
         send(order, change)
     }
 
+    /** Staff pressed Undo: moves the order back to the status before its last change (FR-095). */
+    fun undo(order: OnlineOrder) {
+        if (_state.value.changes[order.reference] != null) return
+        if (order.reference !in _state.value.undoable) {
+            _state.update { it.copy(snackbarMessage = "This change can't be undone any more.") }
+            return
+        }
+        send(order, PendingChange(from = order.status, to = order.status, reason = null, correlationId = newCorrelationId(), undo = true))
+    }
+
     /** Tries a failed change again with the same correlation id. */
     fun retry(reference: String) {
         val order = _state.value.orders.firstOrNull { it.reference == reference } ?: return
@@ -132,17 +165,28 @@ class OnlineOrdersCoordinator(
     private fun send(order: OnlineOrder, change: PendingChange) {
         _state.update { it.copy(changes = it.changes + (order.reference to change)) }
         scope.launch {
-            val result = repository.changeStatus(
-                reference = order.reference,
-                from = change.from,
-                to = change.to,
-                reason = change.reason,
-                correlationId = change.correlationId
-            )
+            val result = if (change.undo) {
+                repository.undoStatus(order.reference, change.from, change.correlationId)
+            } else {
+                repository.changeStatus(
+                    reference = order.reference,
+                    from = change.from,
+                    to = change.to,
+                    reason = change.reason,
+                    correlationId = change.correlationId
+                )
+            }
             when (result) {
                 is OnlineOrderChangeResult.Changed -> {
                     var message: String? = null
-                    if (OnlineOrderRules.deductsStock(change.to)) {
+                    if (change.undo) {
+                        undone[order.reference] = result.status
+                        message = if (change.from == OnlineOrderStatus.Completed) {
+                            restoreMessage(order, result.voidedSaleId)
+                        } else {
+                            "${order.reference} is back to ${result.status.label}."
+                        }
+                    } else if (OnlineOrderRules.deductsStock(change.to)) {
                         message = stockMessage(order)
                     }
                     _state.update {
@@ -174,6 +218,14 @@ class OnlineOrdersCoordinator(
         null
     } catch (e: Exception) {
         "${order.reference} is completed, but its stock couldn't be updated. Adjust the stock by hand."
+    }
+
+    /** Puts back an undone Complete's stock and says what happened. */
+    private suspend fun restoreMessage(order: OnlineOrder, voidedSaleId: Long?): String = try {
+        deductStock.restore(order, voidedSaleId, localSales)
+        "${order.reference} is back to Ready. Its sale is voided and the stock is back."
+    } catch (e: Exception) {
+        "${order.reference} is back to Ready and its sale is voided, but the stock couldn't be put back. Adjust the stock by hand."
     }
 
     fun clearSnackbar() {
