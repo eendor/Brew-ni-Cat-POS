@@ -66,7 +66,7 @@ object ProductAddOnCatalog {
         }
     }
 
-    /** Mixing 2 flavors is offered on fries only for now (same rule as the website). */
+    /** Mixing up to 3 flavors is offered on fries only for now (same rule as the website). */
     fun allowsFlavorMix(itemId: String, itemName: String? = null): Boolean =
         itemId.lowercase().contains("fries") || itemName?.lowercase()?.contains("fries") == true
 
