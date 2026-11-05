@@ -10,7 +10,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Mixed flavors (TC-P4-252 to TC-P4-254): two flavors on one line at the size price. */
+/** Mixed flavors (TC-P4-252 to TC-P4-254, TC-P6-221): up to three flavors on one line at the size price. */
 class MixedFlavorTest {
 
     @Test
@@ -49,5 +49,38 @@ class MixedFlavorTest {
         assertFalse(ProductAddOnCatalog.allowsFlavorMix("bite_takoyaki", "Takoyaki (Pawsome Balls)"))
         assertFalse(ProductAddOnCatalog.allowsFlavorMix("drink_soda", "Soda (Fizzy Felines)"))
         assertFalse(ProductAddOnCatalog.allowsFlavorMix("sedaap_spicy_chicken", "Sedaap Spicy Chicken"))
+    }
+
+    @Test
+    fun `fries can mix up to three flavors`() {
+        // TC-P6-221
+        val base = CartLineSelection.mixFlavors(listOf("BBQ Scratch", "Cheesy Purr", "Sour Cream"))
+        assertEquals("BBQ Scratch / Cheesy Purr / Sour Cream", base)
+        val parsed = CartLineSelection.parse(CartLineSelection(base, null, emptyList()).encode(), "item_fries")
+        assertEquals(listOf("BBQ Scratch", "Cheesy Purr", "Sour Cream"), CartLineSelection.mixParts(parsed.baseFlavor))
+
+        // 2 or 3 picks can go to the cart, and a 4th pick replaces the oldest.
+        assertFalse(CartLineSelection.canFinishMix(1))
+        assertTrue(CartLineSelection.canFinishMix(2))
+        assertTrue(CartLineSelection.canFinishMix(3))
+        assertFalse(CartLineSelection.canFinishMix(4))
+        var picks = emptyList<String>()
+        listOf("BBQ Scratch", "Cheesy Purr", "Sour Cream", "Spicy Claw").forEach {
+            picks = CartLineSelection.toggleMixPick(picks, it)
+        }
+        assertEquals(listOf("Cheesy Purr", "Sour Cream", "Spicy Claw"), picks)
+        assertEquals(listOf("Cheesy Purr", "Spicy Claw"), CartLineSelection.toggleMixPick(picks, "Sour Cream"))
+
+        // Same price and stock rules as a 2-flavor mix.
+        assertEquals(50.0, Variant("size_medium", "Medium", 50.0).getPrice(base), 0.0)
+        val soda = Variant("size_12oz", "12oz", 0.0, mapOf("Yogurt Yarn" to 39.0, "Honey Peach Paws" to 45.0, "Lychee" to 42.0))
+        assertEquals(45.0, soda.getPrice("Yogurt Yarn / Lychee / Honey Peach Paws"), 0.0)
+        val recipes = listOf(
+            RecipeMapping("m1", "item_fries", "BBQ Scratch", "inv_bbq", 1.0),
+            RecipeMapping("m2", "item_fries", "Cheesy Purr", "inv_cheese", 1.0),
+            RecipeMapping("m3", "item_fries", "Sour Cream", "inv_sour", 1.0),
+            RecipeMapping("m4", "item_fries", "Spicy Claw", "inv_spicy", 1.0)
+        )
+        assertEquals(setOf("m1", "m2", "m3"), RecipeDeductionResolver.resolve(recipes, "Medium", base).map { it.id }.toSet())
     }
 }

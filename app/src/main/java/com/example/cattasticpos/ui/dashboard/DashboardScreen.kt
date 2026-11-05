@@ -1826,11 +1826,7 @@ fun ProductConfigBottomSheet(item: Item, onDismiss: () -> Unit, onAddToCart: (Va
                                             leadingIcon = FluentIcons.menuItemIcon(item.id, item.icon),
                                             onSelect = {
                                                 if (mixMode) {
-                                                    mixPicks = when {
-                                                        flavor in mixPicks -> mixPicks - flavor
-                                                        mixPicks.size < CartLineSelection.MAX_MIXED_FLAVORS -> mixPicks + flavor
-                                                        else -> mixPicks.drop(1) + flavor
-                                                    }
+                                                    mixPicks = CartLineSelection.toggleMixPick(mixPicks, flavor)
                                                 } else {
                                                     continueWith(flavor)
                                                 }
@@ -1853,12 +1849,12 @@ fun ProductConfigBottomSheet(item: Item, onDismiss: () -> Unit, onAddToCart: (Va
                                         },
                                         modifier = Modifier.heightIn(min = 44.dp)
                                     ) {
-                                        Text(if (mixMode) "Single flavor" else "Mix ${CartLineSelection.MAX_MIXED_FLAVORS} flavors")
+                                        Text(if (mixMode) "Single flavor" else "Mix up to ${CartLineSelection.MAX_MIXED_FLAVORS} flavors")
                                     }
                                     if (mixMode) {
                                         Button(
                                             onClick = { continueWith(CartLineSelection.mixFlavors(mixPicks)) },
-                                            enabled = mixPicks.size == CartLineSelection.MAX_MIXED_FLAVORS,
+                                            enabled = CartLineSelection.canFinishMix(mixPicks.size),
                                             modifier = Modifier.heightIn(min = 44.dp)
                                         ) {
                                             Text("Continue (${mixPicks.size}/${CartLineSelection.MAX_MIXED_FLAVORS})")
@@ -1868,7 +1864,7 @@ fun ProductConfigBottomSheet(item: Item, onDismiss: () -> Unit, onAddToCart: (Va
                                 Spacer(modifier = Modifier.height(8.dp))
                             }
                             Text(
-                                text = if (mixMode) "Pick ${CartLineSelection.MAX_MIXED_FLAVORS} flavors, same price as the size" else "Tap a flavor to continue",
+                                text = if (mixMode) "Pick ${CartLineSelection.MIN_MIXED_FLAVORS} or ${CartLineSelection.MAX_MIXED_FLAVORS} flavors, same price as the size" else "Tap a flavor to continue",
                                 modifier = Modifier.fillMaxWidth(),
                                 fontSize = 12.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,

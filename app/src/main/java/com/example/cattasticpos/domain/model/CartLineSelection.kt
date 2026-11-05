@@ -38,8 +38,21 @@ data class CartLineSelection(
         /** Joins the flavors of a mixed order, e.g. "BBQ Scratch / Cheesy Purr". */
         const val MIX_SEPARATOR = " / "
 
+        /** A mix has at least this many flavors; one flavor is a normal order. */
+        const val MIN_MIXED_FLAVORS = 2
+
         /** Fries can mix up to this many flavors, at the normal size price (see ProductAddOnCatalog.allowsFlavorMix). */
-        const val MAX_MIXED_FLAVORS = 2
+        const val MAX_MIXED_FLAVORS = 3
+
+        /** Whether a mix with this many picked flavors can go to the cart. */
+        fun canFinishMix(pickCount: Int): Boolean = pickCount in MIN_MIXED_FLAVORS..MAX_MIXED_FLAVORS
+
+        /** Adds or removes a picked flavor. Past the limit, the oldest pick makes room. */
+        fun toggleMixPick(picks: List<String>, flavor: String): List<String> = when {
+            flavor in picks -> picks - flavor
+            picks.size < MAX_MIXED_FLAVORS -> picks + flavor
+            else -> picks.drop(1) + flavor
+        }
 
         /** The flavors in a base flavor string: one entry, or each part of a mix. */
         fun mixParts(baseFlavor: String?): List<String> =
