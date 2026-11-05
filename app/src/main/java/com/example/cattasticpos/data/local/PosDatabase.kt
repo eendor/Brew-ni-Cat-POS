@@ -37,7 +37,7 @@ import kotlinx.coroutines.launch
         AppConfigEntity::class,
         VoidRecordEntity::class
     ],
-    version = 21,
+    version = 22,
     exportSchema = false
 )
 abstract class PosDatabase : RoomDatabase() {
@@ -93,7 +93,8 @@ abstract class PosDatabase : RoomDatabase() {
                     MIGRATION_17_18,
                     MIGRATION_18_19,
                     MIGRATION_19_20,
-                    MIGRATION_20_21
+                    MIGRATION_20_21,
+                    MIGRATION_21_22
                 )
                 .addCallback(PosDatabaseCallback(appContext, scope))
                 .addCallback(MigrationSuccessCallback(appContext))
@@ -236,6 +237,20 @@ abstract class PosDatabase : RoomDatabase() {
         val MIGRATION_20_21 = object : androidx.room.migration.Migration(20, 21) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 val id = REMOVED_FREE_SALE_REMOTE_ID
+                db.execSQL("DELETE FROM order_items WHERE orderId IN (SELECT id FROM orders WHERE remoteId = $id)")
+                db.execSQL("DELETE FROM orders WHERE remoteId = $id")
+            }
+        }
+
+        /** Sale from the test online order of 2026-11-02; it was already removed from the shared database. */
+        internal const val REMOVED_TEST_SALE_REMOTE_ID = 2000000000000001L
+
+        // The same cleanup as MIGRATION_20_21 for the earlier test sale: deletes only its local
+        // copy (and a void record, if any) and leaves the stock as it is. No schema change.
+        val MIGRATION_21_22 = object : androidx.room.migration.Migration(21, 22) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                val id = REMOVED_TEST_SALE_REMOTE_ID
+                db.execSQL("DELETE FROM void_records WHERE orderId IN (SELECT id FROM orders WHERE remoteId = $id)")
                 db.execSQL("DELETE FROM order_items WHERE orderId IN (SELECT id FROM orders WHERE remoteId = $id)")
                 db.execSQL("DELETE FROM orders WHERE remoteId = $id")
             }
