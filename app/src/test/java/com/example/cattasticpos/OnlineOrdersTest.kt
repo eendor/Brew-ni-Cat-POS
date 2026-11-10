@@ -485,8 +485,9 @@ class OnlineOrdersTest {
         r.coordinator.setClosed(true, "  Back tomorrow at 1 PM. ")
         assertEquals(ShopClosure(true, "Back tomorrow at 1 PM."), r.orders.savedClosures.last())
         assertEquals(ShopClosure(true, "Back tomorrow at 1 PM."), r.coordinator.state.value.closure)
+        // Update 2026-11-11 (FR-112): the switch lasts for today only, so the message says so.
         assertEquals(
-            "The shop shows as closed today. Online orders are paused.",
+            "The shop is closed for today. Online orders are paused until tomorrow.",
             r.coordinator.state.value.snackbarMessage
         )
 
@@ -521,6 +522,18 @@ class OnlineOrdersTest {
         assertNull(parseClosure("[]"))
         assertNull(parseClosure("not json"))
         assertNull(parseClosure("""[{"content":{"text":"x"}}]"""))
+    }
+
+    @Test
+    fun `TC-P6-235 saving the switch keeps the opening hours the top bar needs`() {
+        val r = rig(order("BNC-AAAAAA", Pending))
+        val hours = mapOf(java.time.DayOfWeek.MONDAY to com.example.cattasticpos.domain.model.OpeningHours(
+            java.time.LocalTime.of(11, 0), java.time.LocalTime.of(21, 0)))
+        r.orders.closure = ShopClosure(closed = false, hours = hours)
+        r.coordinator.refresh()
+        r.coordinator.setClosed(true, "")
+        assertEquals(hours, r.coordinator.state.value.closure?.hours)
+        assertEquals(true, r.coordinator.state.value.closure?.closed)
     }
 
     private fun <T> CoroutineScope.launchCollect(flow: kotlinx.coroutines.flow.SharedFlow<T>, onEach: (T) -> Unit) =

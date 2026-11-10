@@ -149,7 +149,10 @@ class MainActivity : ComponentActivity() {
                                     onNavigateToHistory = { navigateTo("pin_history") },
                                     onNavigateToInventory = { navigateTo("inventory") },
                                     onNavigateToOnlineOrders = { navigateTo("online_orders") },
-                                    newOnlineOrderCount = onlineOrdersState.newCount
+                                    newOnlineOrderCount = onlineOrdersState.newCount,
+                                    shopClosure = onlineOrdersState.closure,
+                                    shopClosureSaving = onlineOrdersState.closureSaving,
+                                    onSetShopClosed = { closed, note -> onlineOrdersViewModel.setClosed(closed, note) }
                                 )
                             }
                             "online_orders" -> {
