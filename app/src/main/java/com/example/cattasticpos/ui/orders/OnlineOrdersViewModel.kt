@@ -58,6 +58,7 @@ class OnlineOrdersViewModel(
     fun undo(order: OnlineOrder) = coordinator.undo(order)
     fun retry(reference: String) = coordinator.retry(reference)
     fun dismiss(reference: String) = coordinator.dismiss(reference)
+    fun setClosed(closed: Boolean, note: String = "") = coordinator.setClosed(closed, note)
     fun clearSnackbar() = coordinator.clearSnackbar()
 
     companion object {

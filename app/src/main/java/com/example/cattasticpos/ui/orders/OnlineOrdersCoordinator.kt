@@ -4,6 +4,7 @@ import com.example.cattasticpos.domain.model.OnlineOrder
 import com.example.cattasticpos.domain.model.OnlineOrderChangeResult
 import com.example.cattasticpos.domain.model.OnlineOrderRules
 import com.example.cattasticpos.domain.model.OnlineOrderStatus
+import com.example.cattasticpos.domain.model.ShopClosure
 import com.example.cattasticpos.domain.repository.OnlineOrdersRepository
 import com.example.cattasticpos.domain.usecase.DeductOnlineOrderStockUseCase
 import com.example.cattasticpos.domain.usecase.LocalSaleStore
@@ -48,7 +49,10 @@ data class OnlineOrdersUiState(
     val changes: Map<String, PendingChange> = emptyMap(),
     val snackbarMessage: String? = null,
     /** Orders whose last change can still be undone, by reference (FR-095). */
-    val undoable: Set<String> = emptySet()
+    val undoable: Set<String> = emptySet(),
+    /** The "Closed today" switch; null until it is read, or when the server can't give it. */
+    val closure: ShopClosure? = null,
+    val closureSaving: Boolean = false
 ) {
     /** Orders waiting for staff to accept or reject them. */
     val newCount: Int get() = orders.count { it.status == OnlineOrderStatus.Pending }
@@ -92,6 +96,9 @@ class OnlineOrdersCoordinator(
     }
 
     private suspend fun load() = refreshLock.withLock {
+        repository.fetchClosure().onSuccess { closure ->
+            _state.update { if (it.closureSaving) it else it.copy(closure = closure) }
+        }
         repository.fetchOrders()
             .onSuccess { orders ->
                 val fresh = orders.filter {
@@ -157,6 +164,39 @@ class OnlineOrdersCoordinator(
     }
 
     /** Gives up on a failed change and shows the order as the database has it. */
+    /**
+     * Turns "Closed today" on or off (Connect FR-111). The switch only moves when the database
+     * answers, so the screen never shows a state the website doesn't have.
+     */
+    fun setClosed(closed: Boolean, note: String = "") {
+        if (_state.value.closureSaving) return
+        _state.update { it.copy(closureSaving = true) }
+        scope.launch {
+            repository.saveClosure(ShopClosure(closed, if (closed) note.trim() else ""))
+                .onSuccess { saved ->
+                    _state.update {
+                        it.copy(
+                            closure = saved,
+                            closureSaving = false,
+                            snackbarMessage = if (saved.closed) {
+                                "The shop shows as closed today. Online orders are paused."
+                            } else {
+                                "The shop is open again. Online orders are back on."
+                            }
+                        )
+                    }
+                }
+                .onFailure { error ->
+                    _state.update {
+                        it.copy(
+                            closureSaving = false,
+                            snackbarMessage = error.message ?: "Couldn't save Closed today. Try again."
+                        )
+                    }
+                }
+        }
+    }
+
     fun dismiss(reference: String) {
         _state.update { it.copy(changes = it.changes - reference) }
         refresh()
