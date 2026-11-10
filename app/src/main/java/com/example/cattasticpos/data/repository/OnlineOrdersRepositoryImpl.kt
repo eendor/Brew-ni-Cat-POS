@@ -6,6 +6,7 @@ import com.example.cattasticpos.data.remote.OnlineOrderJson
 import com.example.cattasticpos.domain.model.OnlineOrder
 import com.example.cattasticpos.domain.model.OnlineOrderChangeResult
 import com.example.cattasticpos.domain.model.OnlineOrderStatus
+import com.example.cattasticpos.domain.model.ShopClosure
 import com.example.cattasticpos.domain.repository.OnlineOrdersRepository
 import com.example.cattasticpos.service.SupabaseAuthManager
 import kotlinx.coroutines.Dispatchers
@@ -14,6 +15,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
@@ -122,10 +124,67 @@ class OnlineOrdersRepositoryImpl(
             }
         }
 
+    override suspend fun fetchClosure(): Result<ShopClosure> = withContext(Dispatchers.IO) {
+        runCatching {
+            val (url, key) = config() ?: error("Cloud sync is not set up on this device.")
+            val request = Request.Builder()
+                .url("$url/rest/v1/site_content?section=eq.closure&select=content")
+                .get()
+                .header("apikey", key)
+                .header("Authorization", "Bearer ${authManager.getValidAccessToken() ?: key}")
+                .build()
+            client.newCall(request).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                if (!response.isSuccessful) error("Couldn't read Closed today (${response.code}).")
+                parseClosure(body) ?: error("Closed today isn't set up on the server yet.")
+            }
+        }.onFailure { Log.w(TAG, "fetchClosure: ${it.message}") }
+    }
+
+    override suspend fun saveClosure(closure: ShopClosure): Result<ShopClosure> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val (url, key) = config() ?: error("Cloud sync is not set up on this device.")
+                val token = authManager.getValidAccessToken()
+                    ?: error("Sign in with the store account first.")
+                val content = JSONObject()
+                    .put("closed", closure.closed)
+                    .put("note", closure.note.trim().take(ShopClosure.MAX_NOTE))
+                val request = Request.Builder()
+                    .url("$url/rest/v1/site_content?section=eq.closure&select=content")
+                    .patch(JSONObject().put("content", content).toString().toRequestBody(JSON))
+                    .header("apikey", key)
+                    .header("Authorization", "Bearer $token")
+                    .header("Content-Type", "application/json")
+                    .header("Prefer", "return=representation")
+                    .build()
+                client.newCall(request).execute().use { response ->
+                    val body = response.body?.string().orEmpty()
+                    if (!response.isSuccessful) {
+                        error("The server didn't save Closed today (${response.code}). Try again.")
+                    }
+                    // No row back: not the store account, or the server isn't set up yet.
+                    parseClosure(body)
+                        ?: error("This account can't change Closed today. Sign in with the store account.")
+                }
+            }.onFailure { Log.w(TAG, "saveClosure: ${it.message}") }
+        }
+
     private suspend fun config(): Pair<String, String>? {
         val config = appConfigDao.getAppConfigOnce() ?: return null
         val url = config.supabaseUrl.trim()
         val key = config.supabaseAnonKey.trim()
         return if (url.isEmpty() || key.isEmpty()) null else url to key
     }
+}
+
+/** The `closure` row from a PostgREST answer, or null when there is none. */
+internal fun parseClosure(body: String): ShopClosure? {
+    val rows = runCatching { JSONArray(body) }.getOrNull() ?: return null
+    val content = rows.optJSONObject(0)?.optJSONObject("content") ?: return null
+    if (!content.has("closed")) return null
+    return ShopClosure(
+        closed = content.optBoolean("closed", false),
+        note = content.optString("note", "")
+    )
 }

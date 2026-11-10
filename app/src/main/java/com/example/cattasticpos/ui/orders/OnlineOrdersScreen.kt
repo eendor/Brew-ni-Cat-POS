@@ -27,6 +27,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -45,6 +47,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.cattasticpos.domain.model.OnlineOrder
 import com.example.cattasticpos.domain.model.OnlineOrderRules
 import com.example.cattasticpos.domain.model.OnlineOrderStatus
+import com.example.cattasticpos.domain.model.ShopClosure
 import com.example.cattasticpos.ui.adaptive.AdaptiveScaffold
 import com.example.cattasticpos.ui.adaptive.AdaptiveSnackbarHost
 import com.example.cattasticpos.ui.adaptive.AdaptiveTopAppBar
@@ -104,6 +107,8 @@ fun OnlineOrdersScreen(
     var tab by remember { mutableStateOf(OrdersTab.Active) }
     // an order waiting for a reason before it is rejected or cancelled
     var reasonFor by remember { mutableStateOf<Pair<OnlineOrder, OnlineOrderStatus>?>(null) }
+    // asking for an optional note before closing the shop for today
+    var askingClosedNote by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.snackbarMessage) {
         state.snackbarMessage?.let {
@@ -152,6 +157,14 @@ fun OnlineOrdersScreen(
                 .background(MaterialTheme.colorScheme.background)
                 .padding(horizontal = 16.dp)
         ) {
+            Spacer(Modifier.height(8.dp))
+            ClosedTodayRow(
+                closure = state.closure,
+                saving = state.closureSaving,
+                onChange = { closed ->
+                    if (closed) askingClosedNote = true else viewModel.setClosed(false)
+                }
+            )
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 FilterChip(
@@ -224,6 +237,15 @@ fun OnlineOrdersScreen(
         }
     }
 
+    if (askingClosedNote) {
+        ClosedNoteDialog(
+            onDismiss = { askingClosedNote = false },
+            onConfirm = { note ->
+                askingClosedNote = false
+                viewModel.setClosed(true, note)
+            }
+        )
+    }
     reasonFor?.let { (order, to) ->
         ReasonDialog(
             order = order,
@@ -452,3 +474,67 @@ private fun ReasonDialog(
         }
     }
 }
+
+/**
+ * The owner's "Closed today" switch (Connect FR-111). While it is on, the website and Messenger
+ * say the shop is closed and take no online orders. Hidden until the server answers.
+ */
+@Composable
+private fun ClosedTodayRow(closure: ShopClosure?, saving: Boolean, onChange: (Boolean) -> Unit) {
+    if (closure == null) return
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                if (closure.closed) MaterialTheme.colorScheme.errorContainer
+                else MaterialTheme.colorScheme.surfaceVariant,
+                RoundedCornerShape(12.dp)
+            )
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text("Closed today", fontWeight = FontWeight.SemiBold)
+            Text(
+                text = when {
+                    closure.closed && closure.note.isNotBlank() ->
+                        "Website and Messenger say closed: ${closure.note}"
+                    closure.closed -> "Website and Messenger say closed. Online orders are paused."
+                    else -> "Turn on to pause online orders for today."
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = adaptiveBodyMuted()
+            )
+        }
+        if (saving) {
+            CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+            Spacer(Modifier.width(8.dp))
+        }
+        Switch(checked = closure.closed, onCheckedChange = onChange, enabled = !saving)
+    }
+}
+
+@Composable
+private fun ClosedNoteDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
+    var note by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Close the shop for today?") },
+        text = {
+            Column {
+                Text("The website and Messenger will say the shop is closed and won't take online orders until you turn this off.")
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = note,
+                    onValueChange = { note = it.replace(Regex("[\\r\\n]+"), " ").take(ShopClosure.MAX_NOTE) },
+                    label = { Text("Note for customers (optional)") },
+                    placeholder = { Text("e.g. Back tomorrow at 1 PM") },
+                    singleLine = true
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = { onConfirm(note) }) { Text("Close today") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
+}
+

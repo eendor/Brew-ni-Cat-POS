@@ -1,5 +1,8 @@
 package com.example.cattasticpos
 
+import com.example.cattasticpos.data.repository.parseClosure
+import com.example.cattasticpos.domain.model.ShopClosure
+
 import com.example.cattasticpos.data.remote.OnlineOrderJson
 import com.example.cattasticpos.domain.model.Category
 import com.example.cattasticpos.domain.model.InventoryItem
@@ -91,6 +94,20 @@ class OnlineOrdersTest {
                 orders = orders.map { if (it.reference == reference) it.copy(status = answer.status) else it }
             }
             return answer
+        }
+
+        var closure: ShopClosure? = ShopClosure(closed = false)
+        val savedClosures = mutableListOf<ShopClosure>()
+        var saveClosureFails = false
+
+        override suspend fun fetchClosure(): Result<ShopClosure> =
+            closure?.let { Result.success(it) } ?: Result.failure(IllegalStateException("not set up"))
+
+        override suspend fun saveClosure(closure: ShopClosure): Result<ShopClosure> {
+            savedClosures += closure
+            if (saveClosureFails) return Result.failure(IllegalStateException("This account can't change Closed today."))
+            this.closure = closure
+            return Result.success(closure)
         }
     }
 
@@ -457,6 +474,53 @@ class OnlineOrdersTest {
         r2.coordinator.undo(other)
         assertEquals("A change can only be undone within 5 minutes.", r2.coordinator.state.value.snackbarMessage)
         assertNull(r2.coordinator.state.value.changes["BNC-BBBBBB"])
+    }
+
+    @Test
+    fun `TC-P6-230 Closed today is read with the orders, saved with a note, and turned off without one`() {
+        val r = rig(order("BNC-AAAAAA", Pending))
+        r.coordinator.refresh()
+        assertEquals(ShopClosure(closed = false), r.coordinator.state.value.closure)
+
+        r.coordinator.setClosed(true, "  Back tomorrow at 1 PM. ")
+        assertEquals(ShopClosure(true, "Back tomorrow at 1 PM."), r.orders.savedClosures.last())
+        assertEquals(ShopClosure(true, "Back tomorrow at 1 PM."), r.coordinator.state.value.closure)
+        assertEquals(
+            "The shop shows as closed today. Online orders are paused.",
+            r.coordinator.state.value.snackbarMessage
+        )
+
+        r.coordinator.setClosed(false, "ignored")
+        assertEquals(ShopClosure(false, ""), r.orders.savedClosures.last())
+        assertEquals(false, r.coordinator.state.value.closureSaving)
+    }
+
+    @Test
+    fun `TC-P6-231 a refused Closed today save keeps the switch as the server has it`() {
+        val r = rig(order("BNC-AAAAAA", Pending))
+        r.coordinator.refresh()
+        r.orders.saveClosureFails = true
+        r.coordinator.setClosed(true)
+        assertEquals(ShopClosure(closed = false), r.coordinator.state.value.closure)
+        assertEquals("This account can't change Closed today.", r.coordinator.state.value.snackbarMessage)
+
+        // a server without the switch hides it
+        val r2 = rig(order("BNC-BBBBBB", Pending))
+        r2.orders.closure = null
+        r2.coordinator.refresh()
+        assertNull(r2.coordinator.state.value.closure)
+    }
+
+    @Test
+    fun `TC-P6-232 the closure row is read from the server's answer`() {
+        assertEquals(
+            ShopClosure(true, "Back at 1 PM"),
+            parseClosure("""[{"content":{"closed":true,"note":"Back at 1 PM"}}]""")
+        )
+        assertEquals(ShopClosure(false, ""), parseClosure("""[{"content":{"closed":false,"note":""}}]"""))
+        assertNull(parseClosure("[]"))
+        assertNull(parseClosure("not json"))
+        assertNull(parseClosure("""[{"content":{"text":"x"}}]"""))
     }
 
     private fun <T> CoroutineScope.launchCollect(flow: kotlinx.coroutines.flow.SharedFlow<T>, onEach: (T) -> Unit) =
