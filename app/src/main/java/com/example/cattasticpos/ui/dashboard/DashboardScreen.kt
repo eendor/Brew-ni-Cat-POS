@@ -1,5 +1,6 @@
 package com.example.cattasticpos.ui.dashboard
 
+import com.example.cattasticpos.domain.model.ShopClosure
 import com.example.cattasticpos.domain.model.SplitPayment
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -122,6 +123,9 @@ fun DashboardScreen(
     onNavigateToInventory: () -> Unit,
     onNavigateToOnlineOrders: () -> Unit = {},
     newOnlineOrderCount: Int = 0,
+    shopClosure: ShopClosure? = null,
+    shopClosureSaving: Boolean = false,
+    onSetShopClosed: (closed: Boolean, note: String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -180,6 +184,11 @@ fun DashboardScreen(
             )
         },
         actions = {
+            ShopStatusPill(
+                closure = shopClosure,
+                saving = shopClosureSaving,
+                onSetClosed = onSetShopClosed
+            )
             DashboardHeaderIconButton(
                 onClick = {
                     if (isSearchExpanded) {

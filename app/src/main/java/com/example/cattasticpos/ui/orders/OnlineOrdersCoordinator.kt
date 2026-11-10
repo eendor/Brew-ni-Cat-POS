@@ -176,12 +176,13 @@ class OnlineOrdersCoordinator(
                 .onSuccess { saved ->
                     _state.update {
                         it.copy(
-                            closure = saved,
+                            // The save answers with the switch only; keep the hours we have.
+                            closure = saved.copy(hours = it.closure?.hours ?: emptyMap()),
                             closureSaving = false,
                             snackbarMessage = if (saved.closed) {
-                                "The shop shows as closed today. Online orders are paused."
+                                "The shop is closed for today. Online orders are paused until tomorrow."
                             } else {
-                                "The shop is open again. Online orders are back on."
+                                "The shop is open again. Online orders follow the opening hours."
                             }
                         )
                     }

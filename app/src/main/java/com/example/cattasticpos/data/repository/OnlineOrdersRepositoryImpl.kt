@@ -6,6 +6,7 @@ import com.example.cattasticpos.data.remote.OnlineOrderJson
 import com.example.cattasticpos.domain.model.OnlineOrder
 import com.example.cattasticpos.domain.model.OnlineOrderChangeResult
 import com.example.cattasticpos.domain.model.OnlineOrderStatus
+import com.example.cattasticpos.domain.model.OpeningHours
 import com.example.cattasticpos.domain.model.ShopClosure
 import com.example.cattasticpos.domain.repository.OnlineOrdersRepository
 import com.example.cattasticpos.service.SupabaseAuthManager
@@ -17,6 +18,9 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
+import java.time.DayOfWeek
+import java.time.LocalTime
+import java.time.OffsetDateTime
 import java.util.concurrent.TimeUnit
 
 /**
@@ -128,7 +132,8 @@ class OnlineOrdersRepositoryImpl(
         runCatching {
             val (url, key) = config() ?: error("Cloud sync is not set up on this device.")
             val request = Request.Builder()
-                .url("$url/rest/v1/site_content?section=eq.closure&select=content")
+                // The hours come with the switch so the top bar can show Outside hours (FR-112).
+                .url("$url/rest/v1/site_content?section=in.(closure,hours)&select=section,content,updated_at")
                 .get()
                 .header("apikey", key)
                 .header("Authorization", "Bearer ${authManager.getValidAccessToken() ?: key}")
@@ -136,7 +141,7 @@ class OnlineOrdersRepositoryImpl(
             client.newCall(request).execute().use { response ->
                 val body = response.body?.string().orEmpty()
                 if (!response.isSuccessful) error("Couldn't read Closed today (${response.code}).")
-                parseClosure(body) ?: error("Closed today isn't set up on the server yet.")
+                parseShopState(body) ?: error("Closed today isn't set up on the server yet.")
             }
         }.onFailure { Log.w(TAG, "fetchClosure: ${it.message}") }
     }
@@ -151,7 +156,7 @@ class OnlineOrdersRepositoryImpl(
                     .put("closed", closure.closed)
                     .put("note", closure.note.trim().take(ShopClosure.MAX_NOTE))
                 val request = Request.Builder()
-                    .url("$url/rest/v1/site_content?section=eq.closure&select=content")
+                    .url("$url/rest/v1/site_content?section=eq.closure&select=content,updated_at")
                     .patch(JSONObject().put("content", content).toString().toRequestBody(JSON))
                     .header("apikey", key)
                     .header("Authorization", "Bearer $token")
@@ -181,10 +186,40 @@ class OnlineOrdersRepositoryImpl(
 /** The `closure` row from a PostgREST answer, or null when there is none. */
 internal fun parseClosure(body: String): ShopClosure? {
     val rows = runCatching { JSONArray(body) }.getOrNull() ?: return null
-    val content = rows.optJSONObject(0)?.optJSONObject("content") ?: return null
+    return closureFrom(rows.optJSONObject(0))
+}
+
+private fun closureFrom(row: JSONObject?): ShopClosure? {
+    val content = row?.optJSONObject("content") ?: return null
     if (!content.has("closed")) return null
     return ShopClosure(
         closed = content.optBoolean("closed", false),
-        note = content.optString("note", "")
+        note = content.optString("note", ""),
+        changedAt = row.optString("updated_at", "").takeIf { it.isNotBlank() }?.let {
+            runCatching { OffsetDateTime.parse(it).toInstant() }.getOrNull()
+        }
     )
+}
+
+/** The `closure` and `hours` rows together (Connect FR-112). */
+internal fun parseShopState(body: String): ShopClosure? {
+    val rows = runCatching { JSONArray(body) }.getOrNull() ?: return null
+    val bySection = (0 until rows.length()).mapNotNull { rows.optJSONObject(it) }
+        .associateBy { it.optString("section") }
+    val closure = closureFrom(bySection["closure"]) ?: return null
+    return closure.copy(hours = parseHours(bySection["hours"]?.optJSONObject("content")))
+}
+
+/** `{ "days": { "monday": { "opens": "11:00", "closes": "21:00" }, "saturday": null } }`. */
+internal fun parseHours(content: JSONObject?): Map<DayOfWeek, OpeningHours?> {
+    val days = content?.optJSONObject("days") ?: return emptyMap()
+    return runCatching {
+        DayOfWeek.values().associateWith { day ->
+            val name = day.name.lowercase()
+            if (!days.has(name)) error("missing $name")
+            days.optJSONObject(name)?.let {
+                OpeningHours(LocalTime.parse(it.getString("opens")), LocalTime.parse(it.getString("closes")))
+            }
+        }
+    }.getOrDefault(emptyMap())
 }
