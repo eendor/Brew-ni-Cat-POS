@@ -9,5 +9,7 @@ data class UpdateInfo(
     val versionName: String,
     val apkUrl: String,
     val notes: String?,
-    val mandatory: Boolean
+    val mandatory: Boolean,
+    /** Published SHA-256 of the APK (FR-118); null when the row has none, which is refused. */
+    val sha256: String? = null
 )

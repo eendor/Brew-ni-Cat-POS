@@ -26,10 +26,11 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.cattasticpos.domain.model.UpdateInfo
+import com.example.cattasticpos.service.ApkDownload
 import com.example.cattasticpos.service.AppUpdateManager
 import java.io.File
 
-private enum class UpdatePhase { Downloading, NeedsPermission, Failed, Launched }
+private enum class UpdatePhase { Downloading, NeedsPermission, Failed, Rejected, Launched }
 
 /**
  * Fully automatic self-update. On launch it checks the cloud for a newer build and, if one
@@ -57,10 +58,10 @@ fun AppUpdateGate() {
         if (downloadedFile != null) return@LaunchedEffect
         phase = UpdatePhase.Downloading
         progress = 0f
-        val file = manager.downloadApk(u.apkUrl) { progress = it }
-        if (file == null) {
-            phase = UpdatePhase.Failed
-            return@LaunchedEffect
+        val file = when (val result = manager.downloadApk(u) { progress = it }) {
+            is ApkDownload.Ok -> result.file
+            ApkDownload.Failed -> { phase = UpdatePhase.Failed; return@LaunchedEffect }
+            ApkDownload.Rejected -> { phase = UpdatePhase.Rejected; return@LaunchedEffect }
         }
         downloadedFile = file
         phase = if (manager.installApk(file)) UpdatePhase.Launched else UpdatePhase.NeedsPermission
@@ -86,7 +87,7 @@ fun AppUpdateGate() {
             Text(
                 when (phase) {
                     UpdatePhase.NeedsPermission -> "Allow updates"
-                    UpdatePhase.Failed -> "Update failed"
+                    UpdatePhase.Failed, UpdatePhase.Rejected -> "Update failed"
                     else -> "Updating app"
                 }
             )
@@ -123,6 +124,10 @@ fun AppUpdateGate() {
                     UpdatePhase.Failed -> Text(
                         "Couldn’t download the update. Check the internet connection and try again."
                     )
+                    UpdatePhase.Rejected -> Text(
+                        "The downloaded update didn’t match the published version, so it wasn’t installed. " +
+                            "Try again later, and tell the developer if this keeps happening."
+                    )
                     else -> Text("Preparing update…")
                 }
             }
@@ -133,7 +138,7 @@ fun AppUpdateGate() {
                     val f = downloadedFile
                     if (f != null && manager.installApk(f)) phase = UpdatePhase.Launched
                 }) { Text("Install") }
-                UpdatePhase.Failed -> TextButton(onClick = {
+                UpdatePhase.Failed, UpdatePhase.Rejected -> TextButton(onClick = {
                     downloadedFile = null
                     downloadKey++
                 }) { Text("Retry") }
@@ -143,7 +148,7 @@ fun AppUpdateGate() {
         dismissButton = {
             when (phase) {
                 UpdatePhase.Downloading -> TextButton(onClick = { dismissed = true }) { Text("Hide") }
-                UpdatePhase.NeedsPermission, UpdatePhase.Failed ->
+                UpdatePhase.NeedsPermission, UpdatePhase.Failed, UpdatePhase.Rejected ->
                     TextButton(onClick = { dismissed = true }) { Text("Later") }
                 else -> {}
             }

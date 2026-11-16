@@ -15,6 +15,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
 import java.io.File
+import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
 /**
@@ -69,6 +70,7 @@ class AppUpdateManager(private val context: Context) {
                 }
                 val notes = if (obj.isNull("notes")) null else obj.optString("notes").ifBlank { null }
                 UpdateInfo(
+                    sha256 = ApkChecksum.normalize(if (obj.isNull("sha256")) null else obj.optString("sha256")),
                     versionCode = versionCode,
                     versionName = obj.optString("version_name", ""),
                     apkUrl = apkUrl,
@@ -83,20 +85,25 @@ class AppUpdateManager(private val context: Context) {
     }
 
     /**
-     * Streams the APK to cache/updates/update.apk, reporting 0f..1f progress.
-     * Returns the downloaded file, or null on failure.
+     * Streams the APK to cache/updates/update.apk, reporting 0f..1f progress, and
+     * keeps it only when its SHA-256 matches the published one (FR-118). An update
+     * published without a hash is refused too.
      */
-    suspend fun downloadApk(url: String, onProgress: (Float) -> Unit): File? =
+    suspend fun downloadApk(update: UpdateInfo, onProgress: (Float) -> Unit): ApkDownload =
         withContext(Dispatchers.IO) {
+            val dir = File(context.cacheDir, "updates").apply { mkdirs() }
+            val outFile = File(dir, "update.apk")
+            if (outFile.exists()) outFile.delete()
+            if (update.sha256 == null) {
+                Log.w(TAG, "Update ${update.versionCode} has no SHA-256; not installing it")
+                return@withContext ApkDownload.Rejected
+            }
             try {
-                val dir = File(context.cacheDir, "updates").apply { mkdirs() }
-                val outFile = File(dir, "update.apk")
-                if (outFile.exists()) outFile.delete()
-
-                val request = Request.Builder().url(url).get().build()
+                val digest = MessageDigest.getInstance("SHA-256")
+                val request = Request.Builder().url(update.apkUrl).get().build()
                 client.newCall(request).execute().use { response ->
-                    if (!response.isSuccessful) return@withContext null
-                    val stream = response.body?.byteStream() ?: return@withContext null
+                    if (!response.isSuccessful) return@withContext ApkDownload.Failed
+                    val stream = response.body?.byteStream() ?: return@withContext ApkDownload.Failed
                     val total = response.body?.contentLength() ?: -1L
                     outFile.outputStream().use { out ->
                         val buffer = ByteArray(8 * 1024)
@@ -104,16 +111,24 @@ class AppUpdateManager(private val context: Context) {
                         var read: Int
                         while (stream.read(buffer).also { read = it } != -1) {
                             out.write(buffer, 0, read)
+                            digest.update(buffer, 0, read)
                             downloaded += read
                             if (total > 0) onProgress((downloaded.toFloat() / total).coerceIn(0f, 1f))
                         }
                         out.flush()
                     }
                 }
-                outFile
+                if (ApkChecksum.matches(update.sha256, ApkChecksum.hex(digest.digest()))) {
+                    ApkDownload.Ok(outFile)
+                } else {
+                    Log.w(TAG, "Update ${update.versionCode} failed the SHA-256 check; deleted")
+                    outFile.delete()
+                    ApkDownload.Rejected
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "APK download failed", e)
-                null
+                outFile.delete()
+                ApkDownload.Failed
             }
         }
 

@@ -7,7 +7,10 @@
 > ./gradlew :app:assembleRelease
 > cp app/build/outputs/apk/release/app-release.apk BrewNiCatPOS.apk
 > gh release upload 1.1.0 BrewNiCatPOS.apk --clobber
-> # then bump public.app_release to the new version_code (this triggers device update prompts)
+> sha256sum BrewNiCatPOS.apk
+> # then insert the public.app_release row for the new version_code WITH its sha256
+> # (lowercase hex from sha256sum). This triggers device update prompts. From build 10150
+> # the POS refuses an update whose hash is missing or doesn't match (FR-118).
 > ```
 >
 > The debug-APK paths below are kept for historical reference only.
