@@ -28,7 +28,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.cattasticpos.domain.model.ShopClosure
 import com.example.cattasticpos.domain.model.ShopOpenState
 import com.example.cattasticpos.domain.model.openState
@@ -43,6 +45,9 @@ internal fun shopStateLabel(state: ShopOpenState): String = when (state) {
     ShopOpenState.OUTSIDE_HOURS -> "Outside hours"
 }
 
+/** The same words split over two lines for the narrow phone top bar: "Outside\nhours". */
+internal fun compactShopStateLabel(state: ShopOpenState): String = shopStateLabel(state).replace(' ', '\n')
+
 /**
  * The shop open/closed switch in the dashboard top bar (Connect FR-111, FR-112). The shop is
  * open by default and follows the opening hours; tapping it closes the shop for today, or opens
@@ -53,7 +58,7 @@ fun ShopStatusPill(
     closure: ShopClosure?,
     saving: Boolean,
     onSetClosed: (closed: Boolean, note: String) -> Unit,
-    /** On a phone held upright the top bar has no room for the words, so only a colored dot shows. */
+    /** On a phone held upright the pill uses smaller text on two lines so it fits beside every button. */
     compact: Boolean = false
 ) {
     if (closure == null) return
@@ -78,12 +83,23 @@ fun ShopStatusPill(
         color = background,
         contentColor = content,
         modifier = Modifier
-            .padding(horizontal = 4.dp)
+            .padding(horizontal = if (compact) 2.dp else 4.dp)
             .semantics { contentDescription = "Shop status: ${shopStateLabel(state)}. Tap to change." }
     ) {
         if (compact) {
-            Box(Modifier.padding(10.dp).size(14.dp), contentAlignment = Alignment.Center) {
-                if (saving) CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp, color = content)
+            Box(Modifier.padding(horizontal = 8.dp, vertical = 4.dp), contentAlignment = Alignment.Center) {
+                if (saving) {
+                    CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp, color = content)
+                } else {
+                    Text(
+                        compactShopStateLabel(state),
+                        fontSize = 10.sp,
+                        lineHeight = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2
+                    )
+                }
             }
         } else {
             Row(

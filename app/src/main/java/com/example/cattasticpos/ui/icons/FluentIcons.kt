@@ -89,7 +89,6 @@ object FluentIcons {
     val Calendar: ImageVector = Lucide.Calendar
     val Box: ImageVector = Lucide.Package
     val Wallet: ImageVector = Lucide.Wallet
-    val More: ImageVector = Lucide.Ellipsis
     val Split: ImageVector = Lucide.Split
     val List: ImageVector = Lucide.LayoutList
     val Queue: ImageVector = Lucide.Layers

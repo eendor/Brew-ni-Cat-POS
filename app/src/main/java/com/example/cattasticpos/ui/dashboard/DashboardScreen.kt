@@ -184,9 +184,8 @@ fun DashboardScreen(
             )
         },
         actions = {
-            // A phone held upright has room for about five buttons beside the brand mark, so the
-            // status pill becomes a dot and Queues and History move into a More menu. Otherwise
-            // "Outside hours" pushed Add Expense off the screen.
+            // On a phone held upright, "Outside hours" pushed Add Expense off the screen, so the
+            // pill drops to two lines of small text and the buttons get a little narrower.
             val compactBar = configuration.screenWidthDp < 600
             ShopStatusPill(
                 closure = shopClosure,
@@ -206,7 +205,8 @@ fun DashboardScreen(
                 },
                 icon = FluentIcons.Search,
                 contentDescription = "Search menu",
-                tint = cupertino.accent
+                tint = cupertino.accent,
+                compact = compactBar
             )
             BadgedBox(
                 badge = {
@@ -223,57 +223,38 @@ fun DashboardScreen(
                     } else {
                         "Online orders"
                     },
-                    tint = cupertino.accent
+                    tint = cupertino.accent,
+                    compact = compactBar
                 )
             }
             DashboardHeaderIconButton(
                 onClick = onNavigateToInventory,
                 icon = FluentIcons.Box,
                 contentDescription = "Inventory Management",
-                tint = cupertino.accent
+                tint = cupertino.accent,
+                compact = compactBar
             )
             DashboardHeaderIconButton(
                 onClick = { viewModel.setShowExpenseDialog(true) },
                 icon = FluentIcons.Wallet,
                 contentDescription = "Add Expense",
-                tint = cupertino.accent
+                tint = cupertino.accent,
+                compact = compactBar
             )
-            if (compactBar) {
-                var moreOpen by remember { mutableStateOf(false) }
-                Box {
-                    DashboardHeaderIconButton(
-                        onClick = { moreOpen = true },
-                        icon = FluentIcons.More,
-                        contentDescription = "More",
-                        tint = cupertino.accent
-                    )
-                    DropdownMenu(expanded = moreOpen, onDismissRequest = { moreOpen = false }) {
-                        DropdownMenuItem(
-                            text = { Text("View Queues") },
-                            leadingIcon = { FluentIcon(imageVector = FluentIcons.Queue, contentDescription = null, tint = cupertino.accent, size = 20.dp) },
-                            onClick = { moreOpen = false; viewModel.setShowQueuesDialog(true) }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("History") },
-                            leadingIcon = { FluentIcon(imageVector = FluentIcons.History, contentDescription = null, tint = cupertino.accent, size = 20.dp) },
-                            onClick = { moreOpen = false; onNavigateToHistory() }
-                        )
-                    }
-                }
-            } else {
-                DashboardHeaderIconButton(
-                    onClick = { viewModel.setShowQueuesDialog(true) },
-                    icon = FluentIcons.Queue,
-                    contentDescription = "View Queues",
-                    tint = cupertino.accent
-                )
-                DashboardHeaderIconButton(
-                    onClick = onNavigateToHistory,
-                    icon = FluentIcons.History,
-                    contentDescription = "History",
-                    tint = cupertino.accent
-                )
-            }
+            DashboardHeaderIconButton(
+                onClick = { viewModel.setShowQueuesDialog(true) },
+                icon = FluentIcons.Queue,
+                contentDescription = "View Queues",
+                tint = cupertino.accent,
+                compact = compactBar
+            )
+            DashboardHeaderIconButton(
+                onClick = onNavigateToHistory,
+                icon = FluentIcons.History,
+                contentDescription = "History",
+                tint = cupertino.accent,
+                compact = compactBar
+            )
         }
     ) { innerPadding ->
         Column(
@@ -455,11 +436,13 @@ private fun DashboardHeaderIconButton(
     onClick: () -> Unit,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     contentDescription: String,
-    tint: Color
+    tint: Color,
+    /** Narrower on a phone held upright so the status pill and all six buttons fit. */
+    compact: Boolean = false
 ) {
     IconButton(
         onClick = onClick,
-        modifier = Modifier.size(44.dp)
+        modifier = Modifier.size(if (compact) 40.dp else 44.dp)
     ) {
         FluentIcon(
             imageVector = icon,

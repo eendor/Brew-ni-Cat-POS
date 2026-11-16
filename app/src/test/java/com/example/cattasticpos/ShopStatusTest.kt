@@ -6,6 +6,7 @@ import com.example.cattasticpos.domain.model.OpeningHours
 import com.example.cattasticpos.domain.model.ShopClosure
 import com.example.cattasticpos.domain.model.ShopOpenState
 import com.example.cattasticpos.domain.model.openState
+import com.example.cattasticpos.ui.dashboard.compactShopStateLabel
 import com.example.cattasticpos.ui.dashboard.shopStateLabel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -47,6 +48,10 @@ class ShopStatusTest {
         assertEquals("Open", shopStateLabel(ShopOpenState.OPEN))
         assertEquals("Closed today", shopStateLabel(ShopOpenState.CLOSED_TODAY))
         assertEquals("Outside hours", shopStateLabel(ShopOpenState.OUTSIDE_HOURS))
+        // The phone top bar keeps the same words, on two lines.
+        assertEquals("Open", compactShopStateLabel(ShopOpenState.OPEN))
+        assertEquals("Outside\nhours", compactShopStateLabel(ShopOpenState.OUTSIDE_HOURS))
+        assertEquals("Closed\ntoday", compactShopStateLabel(ShopOpenState.CLOSED_TODAY))
     }
 
     @Test
