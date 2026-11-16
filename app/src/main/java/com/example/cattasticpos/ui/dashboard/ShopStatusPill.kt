@@ -1,5 +1,6 @@
 package com.example.cattasticpos.ui.dashboard
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -51,7 +52,9 @@ internal fun shopStateLabel(state: ShopOpenState): String = when (state) {
 fun ShopStatusPill(
     closure: ShopClosure?,
     saving: Boolean,
-    onSetClosed: (closed: Boolean, note: String) -> Unit
+    onSetClosed: (closed: Boolean, note: String) -> Unit,
+    /** On a phone held upright the top bar has no room for the words, so only a colored dot shows. */
+    compact: Boolean = false
 ) {
     if (closure == null) return
     // Re-check every minute so the pill changes at opening and closing time.
@@ -78,15 +81,21 @@ fun ShopStatusPill(
             .padding(horizontal = 4.dp)
             .semantics { contentDescription = "Shop status: ${shopStateLabel(state)}. Tap to change." }
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (saving) {
-                CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp, color = content)
-                Spacer(Modifier.width(6.dp))
+        if (compact) {
+            Box(Modifier.padding(10.dp).size(14.dp), contentAlignment = Alignment.Center) {
+                if (saving) CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp, color = content)
             }
-            Text(shopStateLabel(state), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+        } else {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (saving) {
+                    CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp, color = content)
+                    Spacer(Modifier.width(6.dp))
+                }
+                Text(shopStateLabel(state), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+            }
         }
     }
 

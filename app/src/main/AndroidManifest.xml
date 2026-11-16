@@ -24,7 +24,7 @@
         <activity
             android:name=".ui.MainActivity"
             android:exported="true"
-            android:screenOrientation="fullSensor"
+            android:screenOrientation="fullUser"
             android:theme="@style/Theme.App.Starting">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -36,7 +36,7 @@
             android:name=".ui.CrashActivity"
             android:exported="false"
             android:process=":crash"
-            android:screenOrientation="fullSensor"
+            android:screenOrientation="fullUser"
             android:theme="@android:style/Theme.Material.Light.NoActionBar" />
 
         <provider

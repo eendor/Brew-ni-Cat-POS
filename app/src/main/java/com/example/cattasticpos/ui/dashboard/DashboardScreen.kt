@@ -184,10 +184,15 @@ fun DashboardScreen(
             )
         },
         actions = {
+            // A phone held upright has room for about five buttons beside the brand mark, so the
+            // status pill becomes a dot and Queues and History move into a More menu. Otherwise
+            // "Outside hours" pushed Add Expense off the screen.
+            val compactBar = configuration.screenWidthDp < 600
             ShopStatusPill(
                 closure = shopClosure,
                 saving = shopClosureSaving,
-                onSetClosed = onSetShopClosed
+                onSetClosed = onSetShopClosed,
+                compact = compactBar
             )
             DashboardHeaderIconButton(
                 onClick = {
@@ -233,18 +238,42 @@ fun DashboardScreen(
                 contentDescription = "Add Expense",
                 tint = cupertino.accent
             )
-            DashboardHeaderIconButton(
-                onClick = { viewModel.setShowQueuesDialog(true) },
-                icon = FluentIcons.Queue,
-                contentDescription = "View Queues",
-                tint = cupertino.accent
-            )
-            DashboardHeaderIconButton(
-                onClick = onNavigateToHistory,
-                icon = FluentIcons.History,
-                contentDescription = "History",
-                tint = cupertino.accent
-            )
+            if (compactBar) {
+                var moreOpen by remember { mutableStateOf(false) }
+                Box {
+                    DashboardHeaderIconButton(
+                        onClick = { moreOpen = true },
+                        icon = FluentIcons.More,
+                        contentDescription = "More",
+                        tint = cupertino.accent
+                    )
+                    DropdownMenu(expanded = moreOpen, onDismissRequest = { moreOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text("View Queues") },
+                            leadingIcon = { FluentIcon(imageVector = FluentIcons.Queue, contentDescription = null, tint = cupertino.accent, size = 20.dp) },
+                            onClick = { moreOpen = false; viewModel.setShowQueuesDialog(true) }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("History") },
+                            leadingIcon = { FluentIcon(imageVector = FluentIcons.History, contentDescription = null, tint = cupertino.accent, size = 20.dp) },
+                            onClick = { moreOpen = false; onNavigateToHistory() }
+                        )
+                    }
+                }
+            } else {
+                DashboardHeaderIconButton(
+                    onClick = { viewModel.setShowQueuesDialog(true) },
+                    icon = FluentIcons.Queue,
+                    contentDescription = "View Queues",
+                    tint = cupertino.accent
+                )
+                DashboardHeaderIconButton(
+                    onClick = onNavigateToHistory,
+                    icon = FluentIcons.History,
+                    contentDescription = "History",
+                    tint = cupertino.accent
+                )
+            }
         }
     ) { innerPadding ->
         Column(
