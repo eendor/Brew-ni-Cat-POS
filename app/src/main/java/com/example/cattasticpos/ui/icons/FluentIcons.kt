@@ -67,6 +67,7 @@ import com.composables.icons.lucide.Users
 import com.composables.icons.lucide.UsersRound
 import com.composables.icons.lucide.Utensils
 import com.composables.icons.lucide.Wallet
+import com.composables.icons.lucide.Ellipsis
 import com.composables.icons.lucide.Split
 import com.composables.icons.lucide.X
 import com.example.cattasticpos.ui.adaptive.glassIconGradient
@@ -88,6 +89,7 @@ object FluentIcons {
     val Calendar: ImageVector = Lucide.Calendar
     val Box: ImageVector = Lucide.Package
     val Wallet: ImageVector = Lucide.Wallet
+    val More: ImageVector = Lucide.Ellipsis
     val Split: ImageVector = Lucide.Split
     val List: ImageVector = Lucide.LayoutList
     val Queue: ImageVector = Lucide.Layers
