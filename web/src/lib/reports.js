@@ -283,3 +283,30 @@ export function isItemLowStock(itemId, recipes, inventory) {
       return Boolean(inv) && inv.current_stock <= inv.reorder_threshold;
     });
 }
+
+/**
+ * The tablets save the GCash details as "account=Personal|ref=1234" (and split payments as
+ * "cash=…|gcash=…|account=…"). The editor shows the account and the reference number apart.
+ */
+export function readPaymentReference(text) {
+  const fields = {};
+  for (const part of String(text || '').split('|')) {
+    const i = part.indexOf('=');
+    if (i > 0) fields[part.slice(0, i).trim()] = part.slice(i + 1).trim();
+  }
+  // Older rows hold plain text with no fields; show it as the reference.
+  if (Object.keys(fields).length === 0) return { account: '', ref: String(text || '').trim(), fields: null };
+  return { account: fields.account || '', ref: fields.ref || '', fields };
+}
+
+/** The stored text with only the reference number changed; the other fields stay as they were. */
+export function writePaymentReference(original, ref) {
+  const parsed = readPaymentReference(original);
+  const next = String(ref || '').trim();
+  if (!parsed.fields) return next || null;
+  const fields = { ...parsed.fields };
+  if (next) fields.ref = next;
+  else delete fields.ref;
+  const text = Object.entries(fields).map(([k, v]) => `${k}=${v}`).join('|');
+  return text || null;
+}

@@ -127,15 +127,19 @@ class SupabaseRealtimeManager(private val context: Context) {
                     // Access tokens expire hourly; push the refreshed one to the
                     // channel so the server keeps delivering RLS-checked events.
                     val token = app.container.supabaseAuthManager.getValidAccessToken()
+                    // Every joined channel needs it: a channel left on the old token is closed by
+                    // the server when that token expires, and its events stop until a reconnect.
                     if (token != null && token != lastToken) {
                         lastToken = token
-                        val tokenMessage = JSONObject().apply {
-                            put("topic", "realtime:public:orders")
-                            put("event", "access_token")
-                            put("payload", JSONObject().apply { put("access_token", token) })
-                            put("ref", (refCount++).toString())
+                        for (topic in listOf("realtime:public:orders", "realtime:public:online_orders")) {
+                            val tokenMessage = JSONObject().apply {
+                                put("topic", topic)
+                                put("event", "access_token")
+                                put("payload", JSONObject().apply { put("access_token", token) })
+                                put("ref", (refCount++).toString())
+                            }
+                            webSocket.send(tokenMessage.toString())
                         }
-                        webSocket.send(tokenMessage.toString())
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Heartbeat failed", e)
@@ -215,6 +219,15 @@ class SupabaseRealtimeManager(private val context: Context) {
             try {
                 val json = JSONObject(text)
                 val event = json.optString("event")
+                // The server closed one of our channels (an expired token, a restart): start the
+                // socket over, which rejoins both channels with a fresh token and re-reads the lists.
+                if ((event == "phx_error" || event == "phx_close") &&
+                    json.optString("topic").startsWith("realtime:public:")
+                ) {
+                    Log.w(TAG, "Realtime channel ${json.optString("topic")} closed ($event). Reconnecting.")
+                    webSocket?.close(1000, "Rejoin channels")
+                    return@launch
+                }
                 if (event != "postgres_changes") return@launch
 
                 val payload = json.optJSONObject("payload") ?: return@launch

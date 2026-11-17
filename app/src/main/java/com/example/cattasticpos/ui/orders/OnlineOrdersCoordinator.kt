@@ -233,6 +233,20 @@ class OnlineOrdersCoordinator(
                     _state.update {
                         it.copy(changes = it.changes - order.reference, snackbarMessage = message ?: it.snackbarMessage)
                     }
+                    // Accepting starts the order too: staff found a separate "Start preparing" tap
+                    // one step too many. The customer still sees both steps.
+                    if (!change.undo && change.to == OnlineOrderStatus.Accepted) {
+                        send(
+                            order.copy(status = OnlineOrderStatus.Accepted),
+                            PendingChange(
+                                from = OnlineOrderStatus.Accepted,
+                                to = OnlineOrderStatus.Preparing,
+                                reason = null,
+                                correlationId = newCorrelationId()
+                            )
+                        )
+                        return@launch
+                    }
                     load()
                 }
                 is OnlineOrderChangeResult.Refused -> {
