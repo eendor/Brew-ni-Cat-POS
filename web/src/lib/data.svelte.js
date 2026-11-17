@@ -31,7 +31,7 @@ async function load(key, query) {
 }
 
 export const fetchOrders = () =>
-  load('orders', supabase.from('orders').select('*, order_items(*)').order('timestamp', { ascending: false }));
+  load('orders', supabase.from('orders').select('*, order_items(*, key:id::text)').order('timestamp', { ascending: false }));
 export const fetchCategories = () => load('categories', supabase.from('categories').select('*').order('name'));
 export const fetchItems = () => load('items', supabase.from('items').select('*').order('name'));
 export const fetchInventory = () => load('inventory', supabase.from('inventory').select('*').order('item_name'));

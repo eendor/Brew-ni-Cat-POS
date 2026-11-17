@@ -192,14 +192,17 @@ export function ordersCsv(orders) {
  * order's existing ones, the scheme the tablets use (order id × 1000 + n).
  */
 export function orderItemChanges(order, working) {
+  // Item ids (order id × 1000 + n) are past what a JS number holds exactly, so rows are
+  // matched by `key`, the id as text (see fetchOrders), and new ids are worked out in BigInt.
+  const keyOf = (i) => i.key ?? (i.id > 0 ? String(i.id) : null);
   const original = order.order_items || [];
   const keep = working.filter((i) => i.quantity > 0 && i.item_name.trim() !== '');
-  const keepIds = new Set(keep.filter((i) => i.id > 0).map((i) => i.id));
-  const deleteIds = original.filter((i) => !keepIds.has(i.id)).map((i) => i.id);
+  const keepKeys = new Set(keep.map(keyOf).filter(Boolean));
+  const deleteIds = original.map(keyOf).filter((k) => k && !keepKeys.has(k));
   const updates = keep
-    .filter((i) => i.id > 0)
+    .filter((i) => keyOf(i))
     .map((i) => ({
-      id: i.id,
+      id: keyOf(i),
       item_name: i.item_name,
       variant_name: i.variant_name,
       flavor: i.flavor || null,
@@ -207,11 +210,12 @@ export function orderItemChanges(order, working) {
       unit_price: i.unit_price,
       total_price: i.quantity * i.unit_price,
     }));
-  const baseId = Math.max(order.id * 1000, ...original.map((i) => i.id));
+  let baseId = BigInt(order.id) * 1000n;
+  for (const k of original.map(keyOf).filter(Boolean)) if (BigInt(k) > baseId) baseId = BigInt(k);
   const inserts = keep
-    .filter((i) => !(i.id > 0))
+    .filter((i) => !keyOf(i))
     .map((i, idx) => ({
-      id: baseId + 1 + idx,
+      id: String(baseId + 1n + BigInt(idx)),
       order_id: order.id,
       item_id: i.item_id || 'custom',
       item_name: i.item_name,
