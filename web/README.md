@@ -1,36 +1,35 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Brew ni Cat POS web panel
 
-## Getting Started
+The owner's panel for the POS. It reads the same Supabase project as the tablets, so sales, orders, expenses, the menu, stock, rewards and the website content all live in one place.
 
-First, run the development server:
+Built with SvelteKit (Svelte 5, plain JavaScript) as a single-page app, deployed on Vercel.
+
+## Pages
+
+| Page | What it does |
+| --- | --- |
+| Sales (`/`) | The day's net sales against the ₱10,000 goal, cash and GCash, what sold, closing the drawer, and the Z-Reading printout. |
+| Orders (`/orders`) | Every sale, grouped by day and filtered by day, tablet and payment. Pick one to fix it or void it. Exports CSV. |
+| Expenses (`/expenses`) | Expenses recorded on the tablets, by day. Deleting one offers Undo. |
+| Menu (`/menu`, `/stock`) | Items by category with sizes, flavors and icons; categories; ingredient stock. |
+| Rewards (`/rewards`) | Check and redeem reward codes, and manage point rewards and game prizes. |
+| Website (`/settings`) | The public website's banner, hours, contact, address, payments, links, riders, about page and gallery. |
+
+## Run it
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev      # http://localhost:5173
+npm test         # the pure logic in src/lib
+npm run build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` point it at another Supabase project. Without them it uses the shop's project and its publishable key, which reads nothing until a store account signs in.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Layout
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+- `src/routes`: one folder per page; `+layout.svelte` has sign-in and the top bar.
+- `src/lib/data.svelte.js`: the shared data (orders, menu, stock, expenses) and the realtime feed.
+- `src/lib/*.js`: logic with tests in `tests/` (reports, rewards, website content, product icons).
+- `src/lib/components`: shared pieces such as the sheet, the order detail and the item editor.
+- `src/app.css`: the design tokens and shared classes, in light and dark.

@@ -9,7 +9,7 @@ import {
   resolveDefaultProductIconKey,
   resolveEffectiveProductIconKey,
   stripIconColumnIfUnsupported,
-} from '../src/lib/product-icons.ts';
+} from '../src/lib/product-icons.js';
 
 test('PRODUCT_ICON_OPTIONS exposes 30 unique DB-valid icon keys matching Android POS', () => {
   assert.equal(PRODUCT_ICON_OPTIONS.length, 30);

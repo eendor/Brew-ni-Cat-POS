@@ -9,7 +9,7 @@ import {
   chanceLabel,
   normalizeCode,
   codeCheckMessage,
-} from '../src/lib/rewards.ts';
+} from '../src/lib/rewards.js';
 
 test('a new reward needs a name and 1 to 10000 points; blank stock and limit mean no limit', () => {
   const draft = { ...emptyDraft('reward', 120), name: '  Free   Latte! ', points: '80' };

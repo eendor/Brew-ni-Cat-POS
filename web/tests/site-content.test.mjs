@@ -5,7 +5,7 @@ import {
   findTakeoutBoxItem,
   getTakeoutBoxPesos,
   updateTakeoutBoxVariantsJson,
-} from '../src/lib/site-content.ts';
+} from '../src/lib/site-content.js';
 
 test('validates hours section and rejects closing time before opening time', () => {
   const validHours = {
