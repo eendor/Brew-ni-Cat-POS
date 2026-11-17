@@ -24,17 +24,10 @@ const config: Config = {
         "txt-4": "var(--text-4)",
       },
       fontFamily: {
-        sans: [
-          "-apple-system",
-          "BlinkMacSystemFont",
-          "SF Pro Text",
-          "SF Pro Display",
-          "var(--font-inter)",
-          "Inter",
-          "Segoe UI",
-          "system-ui",
-          "sans-serif",
-        ],
+        // Inter, as before the redesign. Tailwind sets this on <html>, so the
+        // --font-inter variable is set there too (layout.tsx); without it every
+        // page fell back to the browser's serif font.
+        sans: ["var(--font-inter)", "Inter", "Segoe UI", "system-ui", "sans-serif"],
       },
       borderRadius: {
         "4xl": "2rem",
