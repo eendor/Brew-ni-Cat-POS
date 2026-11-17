@@ -101,9 +101,9 @@ test('saving edited items deletes removed rows, updates kept ones and numbers ne
     { id: 0, item_name: 'C', variant_name: '', flavor: null, quantity: 1, unit_price: 15 },
     { id: 0, item_name: '  ', quantity: 1, unit_price: 99 },
   ]);
-  assert.deepEqual(c.deleteIds, [5002]);
+  assert.deepEqual(c.deleteIds, ['5002']);
   assert.equal(c.updates[0].total_price, 100);
-  assert.equal(c.inserts[0].id, 5003);
+  assert.equal(c.inserts[0].id, '5003');
   assert.equal(c.subtotal, 115);
   assert.equal(c.total, 105);
 });
@@ -123,4 +123,19 @@ test('low stock, ids and flavors', () => {
   assert.equal(isItemLowStock('soda', recipes, []), false);
   assert.equal(slugId('cat_', ' Milk Tea '), 'cat_milk_tea');
   assert.deepEqual(parseFlavors('Matcha, , Oreo '), ['Matcha', 'Oreo']);
+});
+
+test('item edits keep exact ids past the safe integer range', () => {
+  const o = order({ id: 797423000003023, order_items: [
+    { id: 797423000003023000, key: '797423000003023000', item_name: 'A', quantity: 1, unit_price: 10 },
+    { id: 797423000003023000, key: '797423000003023001', item_name: 'B', quantity: 1, unit_price: 20 },
+  ] });
+  const c = orderItemChanges(o, [
+    { ...o.order_items[1], quantity: 2 },
+    { id: 0, item_name: 'Box', quantity: 1, unit_price: 10 },
+  ]);
+  assert.deepEqual(c.deleteIds, ['797423000003023000']);
+  assert.equal(c.updates[0].id, '797423000003023001');
+  assert.equal(c.inserts[0].id, '797423000003023002');
+  assert.equal(c.subtotal, 50);
 });

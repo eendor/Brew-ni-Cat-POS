@@ -132,7 +132,7 @@
 
       {#if working === null}
         <ul class="list panel">
-          {#each items as i (i.id)}
+          {#each items as i, idx (idx)}
             <li><span>{i.quantity}× {itemLabel(i)}<span class="sub num">{formatPrice(i.unit_price)} each</span></span><span class="end">{formatPrice(i.quantity * i.unit_price)}</span></li>
           {:else}
             <li class="muted">No items on this order.</li>
