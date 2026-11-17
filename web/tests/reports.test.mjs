@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   computeStats, dayReport, filterOrders, localDateKey, shiftDateKey, receiptNumber, itemLabel,
   breakdownRange, foodBreakdown, ordersCsv, orderItemChanges, normalizeVariants, startingPrice,
-  isItemLowStock, slugId, parseFlavors, STARTING_FLOAT,
+  isItemLowStock, slugId, parseFlavors, STARTING_FLOAT, readPaymentReference, writePaymentReference,
 } from '../src/lib/reports.js';
 
 const at = (y, m, d, h = 12) => new Date(y, m - 1, d, h).getTime();
@@ -138,4 +138,15 @@ test('item edits keep exact ids past the safe integer range', () => {
   assert.equal(c.updates[0].id, '797423000003023001');
   assert.equal(c.inserts[0].id, '797423000003023002');
   assert.equal(c.subtotal, 50);
+});
+
+test('the GCash account and reference number are read and written apart', () => {
+  assert.deepEqual(readPaymentReference('account=Personal|ref=123'), { account: 'Personal', ref: '123', fields: { account: 'Personal', ref: '123' } });
+  assert.equal(readPaymentReference('account=Personal').ref, '');
+  assert.equal(readPaymentReference('Personal GCash - ').ref, 'Personal GCash -');
+  assert.equal(writePaymentReference('account=Personal', ' 987 '), 'account=Personal|ref=987');
+  assert.equal(writePaymentReference('account=Personal|ref=987', ''), 'account=Personal');
+  assert.equal(writePaymentReference('cash=50|gcash=100|account=Main', '55'), 'cash=50|gcash=100|account=Main|ref=55');
+  assert.equal(writePaymentReference(null, ''), null);
+  assert.equal(writePaymentReference('', '42'), '42');
 });

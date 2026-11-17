@@ -3,7 +3,7 @@
   import { supabase } from '$lib/supabase.js';
   import { fetchOrders, run } from '$lib/data.svelte.js';
   import { notify } from '$lib/toast.svelte.js';
-  import { formatPrice, receiptNumber, itemLabel, orderItemChanges } from '$lib/reports.js';
+  import { formatPrice, receiptNumber, itemLabel, orderItemChanges, readPaymentReference, writePaymentReference } from '$lib/reports.js';
 
   /** One order: who, how it was paid and its items, all correctable, plus void. */
   let { order, onclose } = $props();
@@ -22,7 +22,7 @@
         table_label: order.table_label || '',
         cashier_name: order.cashier_name || '',
         payment_method: order.payment_method || 'CASH',
-        payment_reference: order.payment_reference || '',
+        payment_reference: readPaymentReference(order.payment_reference).ref,
       };
       working = null;
       error = '';
@@ -37,8 +37,9 @@
       details.table_label.trim() !== (order.table_label || '') ||
       details.cashier_name.trim() !== (order.cashier_name || '') ||
       details.payment_method !== order.payment_method ||
-      details.payment_reference.trim() !== (order.payment_reference || ''),
+      details.payment_reference.trim() !== readPaymentReference(order.payment_reference).ref,
   );
+  const gcashAccount = $derived(readPaymentReference(order.payment_reference).account);
   const when = $derived(new Date(order.timestamp).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }));
 
   function addRow() {
@@ -53,7 +54,7 @@
         table_label: details.table_label.trim() || null,
         cashier_name: details.cashier_name.trim() || null,
         payment_method: details.payment_method,
-        payment_reference: details.payment_reference.trim() || null,
+        payment_reference: writePaymentReference(order.payment_reference, details.payment_reference),
       };
       if (working !== null) {
         const change = orderItemChanges(order, working);
@@ -116,7 +117,7 @@
         </div>
       </div>
       {#if details.payment_method === 'GCASH'}
-        <label class="field"><span class="label">GCash reference</span><input class="input num" bind:value={details.payment_reference} placeholder="Optional" maxlength="40" /></label>
+        <label class="field"><span class="label">GCash reference number{gcashAccount ? ` · ${gcashAccount} account` : ''}</span><input class="input num" bind:value={details.payment_reference} placeholder="Optional" maxlength="40" /></label>
       {/if}
     </div>
 

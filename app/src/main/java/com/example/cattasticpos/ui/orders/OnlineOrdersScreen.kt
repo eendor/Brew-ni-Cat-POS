@@ -78,7 +78,7 @@ private fun statusColors(status: OnlineOrderStatus): Pair<Color, Color> = when (
 
 /** The button that moves an order one step forward, by the status it is in now. */
 internal fun primaryStep(status: OnlineOrderStatus): Pair<OnlineOrderStatus, String>? = when (status) {
-    OnlineOrderStatus.Pending -> OnlineOrderStatus.Accepted to "Accept"
+    OnlineOrderStatus.Pending -> OnlineOrderStatus.Accepted to "Accept and start"
     OnlineOrderStatus.Accepted -> OnlineOrderStatus.Preparing to "Start preparing"
     OnlineOrderStatus.Preparing -> OnlineOrderStatus.Ready to "Mark ready"
     OnlineOrderStatus.Ready -> OnlineOrderStatus.Completed to "Complete"
@@ -298,7 +298,7 @@ private fun OrderCard(
                 Column(Modifier.weight(1f)) {
                     Text(order.reference, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                     Text(
-                        text = "${order.customerName} · ${order.customerPhone}",
+                        text = "${order.customerName} · ${order.customerPhone.ifBlank { "No number, reply on Messenger" }}",
                         style = MaterialTheme.typography.bodyMedium,
                         color = adaptiveBodyMuted()
                     )

@@ -307,14 +307,16 @@ class OnlineOrdersTest {
     // ---- the coordinator -----------------------------------------------------------------
 
     @Test
-    fun `TC-P6-195 moving an order forward sends one change and shows the new status`() {
+    fun `TC-P6-195 accepting an order also starts preparing it, one change at a time`() {
         val r = rig(order())
         r.coordinator.refresh()
         r.coordinator.change(r.coordinator.state.value.orders.single(), Accepted)
-        assertEquals(1, r.orders.calls.size)
-        assertEquals(Pending, r.orders.calls.single().from)
-        assertEquals(Accepted, r.orders.calls.single().to)
-        assertEquals(Accepted, r.coordinator.state.value.orders.single().status)
+        assertEquals(2, r.orders.calls.size)
+        assertEquals(Pending, r.orders.calls[0].from)
+        assertEquals(Accepted, r.orders.calls[0].to)
+        assertEquals(Accepted, r.orders.calls[1].from)
+        assertEquals(Preparing, r.orders.calls[1].to)
+        assertEquals(Preparing, r.coordinator.state.value.orders.single().status)
         assertTrue(r.coordinator.state.value.changes.isEmpty())
         // accepting never touches stock
         assertEquals(100.0, r.inventory.stock["cups"]!!, 0.0)
@@ -337,9 +339,9 @@ class OnlineOrdersTest {
         assertEquals(1, r.orders.calls.size)
 
         r.coordinator.retry("BNC-AAAAAA")
-        assertEquals(2, r.orders.calls.size)
+        assertEquals(3, r.orders.calls.size) // the retried accept, then the start-preparing step
         assertEquals(r.orders.calls[0].correlationId, r.orders.calls[1].correlationId)
-        assertEquals(Accepted, r.coordinator.state.value.orders.single().status)
+        assertEquals(Preparing, r.coordinator.state.value.orders.single().status)
         assertTrue(r.coordinator.state.value.changes.isEmpty())
     }
 

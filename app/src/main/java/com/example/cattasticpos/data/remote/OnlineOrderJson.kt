@@ -32,7 +32,8 @@ object OnlineOrderJson {
             reference = json.getString("reference"),
             status = status,
             customerName = json.optString("customer_name"),
-            customerPhone = json.optString("customer_phone"),
+            // Messenger orders can come without a number; optString would turn null into "null".
+            customerPhone = if (json.isNull("customer_phone")) "" else json.optString("customer_phone"),
             notes = json.optString("notes"),
             paymentPreference = json.optString("payment_preference"),
             subtotal = json.optDouble("subtotal", 0.0),
