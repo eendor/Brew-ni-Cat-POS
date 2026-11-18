@@ -3,6 +3,7 @@ package com.example.cattasticpos.data.repository
 import com.example.cattasticpos.data.local.dao.MenuDao
 import com.example.cattasticpos.data.local.entity.CategoryEntity
 import com.example.cattasticpos.data.local.entity.ItemEntity
+import com.example.cattasticpos.domain.catalog.CategoryOrder
 import com.example.cattasticpos.domain.model.Category
 import com.example.cattasticpos.domain.model.Item
 import com.example.cattasticpos.domain.model.Variant
@@ -18,7 +19,7 @@ class MenuRepositoryImpl(
 
     override fun getCategories(): Flow<List<Category>> {
         return menuDao.getCategories().map { entities ->
-            entities.map { Category(it.id, it.name) }
+            CategoryOrder.catTreatsLast(entities.map { Category(it.id, it.name) })
         }
     }
 

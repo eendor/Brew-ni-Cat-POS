@@ -1,4 +1,5 @@
 import { supabase } from './supabase.js';
+import { catTreatsLast } from './category-order.js';
 
 /**
  * Everything the panel shows, loaded once after sign-in and kept current by Supabase
@@ -32,7 +33,11 @@ async function load(key, query) {
 
 export const fetchOrders = () =>
   load('orders', supabase.from('orders').select('*, order_items(*, key:id::text)').order('timestamp', { ascending: false }));
-export const fetchCategories = () => load('categories', supabase.from('categories').select('*').order('name'));
+// Cat Treats (bought to feed the café cats) always comes last; the rest stay A to Z.
+export const fetchCategories = () =>
+  load('categories', supabase.from('categories').select('*').order('name')).then(() => {
+    db.categories = catTreatsLast(db.categories);
+  });
 export const fetchItems = () => load('items', supabase.from('items').select('*').order('name'));
 export const fetchInventory = () => load('inventory', supabase.from('inventory').select('*').order('item_name'));
 export const fetchRecipes = () => load('recipes', supabase.from('recipe_mappings').select('*'));
