@@ -27,6 +27,12 @@ object OnlineOrderJson {
             (0 until lines.length()).map { parseLine(lines.getJSONObject(it)) }
                 .sortedBy { it.lineNumber }
         }
+        val subtotal = json.optDouble("subtotal", 0.0)
+        // Older deployments omit both fields. Only show a complete, valid discount pair.
+        val coinsSpent = json.optDouble("coins_spent", 0.0)
+        val coinDiscount = json.optDouble("coin_discount", 0.0)
+        val hasCoinDiscount = subtotal.isFinite() && coinsSpent.isFinite() && coinsSpent > 0 &&
+            coinDiscount.isFinite() && coinDiscount > 0 && coinDiscount <= subtotal
         return OnlineOrder(
             id = json.getString("id"),
             reference = json.getString("reference"),
@@ -36,12 +42,14 @@ object OnlineOrderJson {
             customerPhone = if (json.isNull("customer_phone")) "" else json.optString("customer_phone"),
             notes = json.optString("notes"),
             paymentPreference = json.optString("payment_preference"),
-            subtotal = json.optDouble("subtotal", 0.0),
+            subtotal = subtotal,
             itemCount = json.optInt("item_count", parsedLines.sumOf { it.quantity }),
             rejectionReason = json.optStringOrNull("rejection_reason"),
             createdAtMillis = parseTime(json.optString("created_at")),
             updatedAtMillis = parseTime(json.optString("updated_at")),
-            lines = parsedLines
+            lines = parsedLines,
+            coinsSpent = if (hasCoinDiscount) coinsSpent else 0.0,
+            coinDiscount = if (hasCoinDiscount) coinDiscount else 0.0
         )
     }
 

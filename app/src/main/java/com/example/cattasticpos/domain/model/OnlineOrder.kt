@@ -42,8 +42,12 @@ data class OnlineOrder(
     val rejectionReason: String?,
     val createdAtMillis: Long,
     val updatedAtMillis: Long,
-    val lines: List<OnlineOrderLine>
-)
+    val lines: List<OnlineOrderLine>,
+    val coinsSpent: Double = 0.0,
+    val coinDiscount: Double = 0.0
+) {
+    val total: Double get() = subtotal - coinDiscount
+}
 
 /**
  * The steps staff may take, the same as `private.is_allowed_shop_step()` in the database. The
