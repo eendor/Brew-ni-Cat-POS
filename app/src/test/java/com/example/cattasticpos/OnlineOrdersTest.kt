@@ -46,6 +46,38 @@ import org.junit.Test
 /** TC-P6-191 to TC-P6-198: the Online orders screen's rules, parsing, retries and stock. */
 class OnlineOrdersTest {
 
+    @Test
+    fun `online order reads coins and the authoritative discount including decimals`() {
+        val order = parseCoinOrder(", \"coins_spent\": \"12.5\", \"coin_discount\": 12.50")
+        assertEquals(12.5, order.coinsSpent, 0.0)
+        assertEquals(12.5, order.coinDiscount, 0.0)
+        assertEquals(87.5, order.total, 0.0)
+    }
+
+    @Test
+    fun `legacy and invalid discounts leave the order subtotal unchanged`() {
+        for (fields in listOf(
+            "",
+            ", \"coins_spent\": null, \"coin_discount\": null",
+            ", \"coins_spent\": 12.5",
+            ", \"coin_discount\": 12.5",
+            ", \"coins_spent\": 12.5, \"coin_discount\": \"invalid\"",
+            ", \"coins_spent\": -1, \"coin_discount\": 12.5",
+            ", \"coins_spent\": 12.5, \"coin_discount\": 101"
+        )) {
+            val order = parseCoinOrder(fields)
+            assertEquals(0.0, order.coinsSpent, 0.0)
+            assertEquals(0.0, order.coinDiscount, 0.0)
+            assertEquals(100.0, order.total, 0.0)
+        }
+    }
+
+    private fun parseCoinOrder(fields: String): OnlineOrder =
+        OnlineOrderJson.parseOrders(
+            """[{"id":"1","reference":"BNCT-TEST","status":"pending","subtotal":100$fields}]"""
+        ).single()
+
+
     // ---- fakes ---------------------------------------------------------------------------
 
     private class FakeOrders(var orders: List<OnlineOrder>) : OnlineOrdersRepository {

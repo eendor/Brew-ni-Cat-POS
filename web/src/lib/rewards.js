@@ -6,7 +6,7 @@
  */
 export const MAX_NAME = 60;
 export const MAX_DESCRIPTION = 200;
-export const MAX_POINTS = 10000;
+export const MAX_COINS = 10000;
 /** A prize's chance is out of this many plays. */
 export const CHANCE_OUT_OF = 1000;
 const ID_PATTERN = /^[a-z0-9][a-z0-9-]{1,59}$/;
@@ -37,7 +37,7 @@ export function draftFromReward(reward) {
         kind: reward.kind,
         name: reward.name,
         description: reward.description ?? '',
-        points: reward.points_cost === null ? '' : String(reward.points_cost),
+        coins: reward.points_cost === null ? '' : String(reward.points_cost),
         chance: reward.win_chance === null ? '' : String(reward.win_chance),
         stock: reward.stock === null ? '' : String(reward.stock),
         dailyLimit: reward.daily_limit === null ? '' : String(reward.daily_limit),
@@ -50,7 +50,7 @@ export function emptyDraft(kind, sortOrder) {
         kind,
         name: '',
         description: '',
-        points: kind === 'reward' ? '50' : '',
+        coins: kind === 'reward' ? '50' : '',
         chance: kind === 'prize' ? '20' : '',
         stock: '',
         dailyLimit: '',
@@ -69,12 +69,12 @@ export function validateRewardDraft(draft, takenIds = []) {
     if (description.length > MAX_DESCRIPTION) {
         return { ok: false, error: `Keep the description to ${MAX_DESCRIPTION} characters.` };
     }
-    let points = null;
+    let coins = null;
     let chance = null;
     if (draft.kind === 'reward') {
-        points = wholeNumber(draft.points);
-        if (points === null || points < 1 || points > MAX_POINTS) {
-            return { ok: false, error: `Points must be a whole number from 1 to ${MAX_POINTS}.` };
+        coins = wholeNumber(draft.coins);
+        if (coins === null || coins < 1 || coins > MAX_COINS) {
+            return { ok: false, error: `Coins must be a whole number from 1 to ${MAX_COINS}.` };
         }
     }
     else {
@@ -109,7 +109,7 @@ export function validateRewardDraft(draft, takenIds = []) {
             kind: draft.kind,
             name,
             description,
-            points_cost: points,
+            points_cost: coins,
             win_chance: chance,
             stock: stock.value,
             daily_limit: daily.value,

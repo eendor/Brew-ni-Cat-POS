@@ -110,14 +110,14 @@
   }
 
   function meta(r) {
-    const parts = [r.kind === 'reward' ? `${r.points_cost} points` : `${r.win_chance} in ${CHANCE_OUT_OF} · ${chanceLabel(r.win_chance ?? 1)}`];
+    const parts = [r.kind === 'reward' ? `${r.points_cost} ${r.points_cost === 1 ? 'coin' : 'coins'}` : `${r.win_chance} in ${CHANCE_OUT_OF} · ${chanceLabel(r.win_chance ?? 1)}`];
     if (r.stock !== null) parts.push(`${r.stock} left`);
     if (r.daily_limit !== null) parts.push(`${r.daily_limit} a day`);
     return parts.join(' · ');
   }
 </script>
 
-<PageHeader title="Rewards" subtitle="What customers can trade points for in the app, and what the game can give away." />
+<PageHeader title="Rewards" subtitle="What customers can trade coins for in the app, and what the game can give away." />
 
 <section class="counter" aria-labelledby="code-title">
   <div class="counter-text">
@@ -158,7 +158,7 @@
     {#if loading}
       <div class="panel pad stack">{#each Array(3) as _}<div class="skeleton" style="height: 24px"></div>{/each}</div>
     {:else if rows.length === 0}
-      <div class="panel"><EmptyState title="None yet" text={kind === 'reward' ? 'Add something customers can buy with points.' : 'Add a prize the game can hand out.'} /></div>
+      <div class="panel"><EmptyState title="None yet" text={kind === 'reward' ? 'Add something customers can buy with coins.' : 'Add a prize the game can hand out.'} /></div>
     {:else}
       <ul class="list panel">
         {#each rows as r (r.id)}
@@ -179,7 +179,7 @@
 {/snippet}
 
 <div class="cols">
-  {@render column('reward', 'Rewards for points', 'Customers spend points on these.')}
+  {@render column('reward', 'Rewards for coins', 'Customers spend coins on these.')}
   {@render column('prize', 'Game prizes', `Chances are out of ${CHANCE_OUT_OF} plays.`)}
 </div>
 
@@ -189,7 +189,7 @@
       <label class="field"><span class="label">Name</span><input class="input" bind:value={draft.name} maxlength={MAX_NAME} /></label>
       <label class="field"><span class="label">Description (optional)</span><textarea class="textarea" rows="2" bind:value={draft.description} maxlength={MAX_DESCRIPTION}></textarea></label>
       {#if draft.kind === 'reward'}
-        <label class="field"><span class="label">Points it costs</span><input class="input" inputmode="numeric" bind:value={draft.points} /></label>
+        <label class="field"><span class="label">Coins it costs</span><input class="input" inputmode="numeric" bind:value={draft.coins} /></label>
       {:else}
         <label class="field">
           <span class="label">Chance, out of {CHANCE_OUT_OF} plays</span>

@@ -278,6 +278,10 @@ private val priceFormat: NumberFormat = NumberFormat.getNumberInstance(Locale.US
     maximumFractionDigits = 2
 }
 
+private val coinFormat: NumberFormat = NumberFormat.getNumberInstance(Locale.US).apply {
+    maximumFractionDigits = 1
+}
+
 private fun peso(value: Double) = "₱" + priceFormat.format(value)
 
 @Composable
@@ -347,10 +351,24 @@ private fun OrderCard(
                 )
             }
             HorizontalDivider()
+            if (order.coinDiscount > 0) {
+                Row {
+                    Text("Subtotal", modifier = Modifier.weight(1f))
+                    Text(peso(order.subtotal))
+                }
+                Row {
+                    val unit = if (order.coinsSpent == 1.0) "coin" else "coins"
+                    Text(
+                        "Coin discount (${coinFormat.format(order.coinsSpent)} $unit used)",
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text("-${peso(order.coinDiscount)}")
+                }
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Total", style = MaterialTheme.typography.labelLarge, color = adaptiveBodyMuted())
                 Spacer(Modifier.weight(1f))
-                Text(peso(order.subtotal), fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                Text(peso(order.total), fontWeight = FontWeight.Bold, fontSize = 18.sp)
             }
             OrderActions(order, change, onStep, onEnd, onRetry, onDismiss)
             if (change == null && canUndo) {

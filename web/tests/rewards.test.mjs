@@ -11,8 +11,8 @@ import {
   codeCheckMessage,
 } from '../src/lib/rewards.js';
 
-test('a new reward needs a name and 1 to 10000 points; blank stock and limit mean no limit', () => {
-  const draft = { ...emptyDraft('reward', 120), name: '  Free   Latte! ', points: '80' };
+test('a new reward needs a name and 1 to 10000 coins; blank stock and limit mean no limit', () => {
+  const draft = { ...emptyDraft('reward', 120), name: '  Free   Latte! ', coins: '80' };
   const checked = validateRewardDraft(draft, ['reward-free-latte']);
   assert.equal(checked.ok, true);
   assert.deepEqual(checked.value, {
@@ -28,13 +28,13 @@ test('a new reward needs a name and 1 to 10000 points; blank stock and limit mea
     sort_order: 120,
   });
   assert.equal(validateRewardDraft({ ...draft, name: ' ' }).ok, false);
-  for (const points of ['0', '10001', '2.5', 'abc', '']) {
-    assert.equal(validateRewardDraft({ ...draft, points }).ok, false, points);
+  for (const coins of ['0', '10001', '2.5', 'abc', '']) {
+    assert.equal(validateRewardDraft({ ...draft, coins }).ok, false, coins);
   }
 });
 
 test('a prize has a chance out of 1000 and never a cost; stock and daily limit are whole numbers', () => {
-  const prize = { ...emptyDraft('prize', 10), name: 'Cookie', chance: '25', stock: '5', dailyLimit: '2', points: '99' };
+  const prize = { ...emptyDraft('prize', 10), name: 'Cookie', chance: '25', stock: '5', dailyLimit: '2', coins: '99' };
   const checked = validateRewardDraft(prize);
   assert.equal(checked.ok, true);
   assert.equal(checked.value.points_cost, null);
