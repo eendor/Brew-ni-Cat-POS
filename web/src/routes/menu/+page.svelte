@@ -21,6 +21,64 @@
   let deleting = $state(null); // the category being deleted
   let confirmText = $state('');
   let busy = $state(false);
+  let dealOpen = $state(false);
+  let dealItem = $state(null);
+  let dealPercent = $state(undefined);
+  let dealActive = $state(false);
+  let dealBusy = $state(false);
+  let dealError = $state('');
+  let deals = $state({});
+  const validDeal = $derived(Number.isInteger(dealPercent) && dealPercent >= 1 && dealPercent <= 99);
+
+  async function loadDeals() {
+    try {
+      const rows = await run(supabase.from('menu_deals').select('item_id, percent_off, active'));
+      deals = Object.fromEntries((rows ?? []).map((row) => [row.item_id, row]));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  $effect(() => { void loadDeals(); });
+
+  async function editDeal(item) {
+    dealItem = item;
+    dealOpen = true;
+    dealBusy = true;
+    dealError = '';
+    try {
+      const loaded = await loadDeals();
+      if (dealItem?.id !== item.id || !dealOpen) return;
+      if (!loaded) {
+        dealError = "Deals aren't available. Try again once checkout deals are enabled.";
+        return;
+      }
+      dealPercent = deals[item.id]?.percent_off;
+      dealActive = deals[item.id]?.active ?? false;
+    } finally {
+      dealBusy = false;
+    }
+  }
+
+  async function saveDeal(event) {
+    event.preventDefault();
+    if (!dealItem || !validDeal || dealBusy || dealError) return;
+    const item = dealItem;
+    dealBusy = true;
+    try {
+      await run(supabase.from('menu_deals').upsert({
+        item_id: item.id, percent_off: dealPercent, active: dealActive,
+      }, { onConflict: 'item_id' }));
+      await loadDeals();
+      dealOpen = false;
+      notify(`Saved the deal for ${item.name}.`);
+    } catch {
+      notify("Couldn't save the deal. Try again.", { tone: 'error' });
+    } finally {
+      dealBusy = false;
+    }
+  }
 
   const q = $derived(query.trim().toLowerCase());
   const sections = $derived.by(() => {
@@ -37,6 +95,11 @@
   function edit(item) {
     editing = item;
     editorOpen = true;
+  }
+
+  function isOnlineDealItem(item) {
+    const key = item.name.toLowerCase().replace(/[^a-z]/g, '');
+    return !['takeoutbox', 'cattreats', 'bottledwater'].includes(key);
   }
 
   function sizesLine(item) {
@@ -160,10 +223,14 @@
                         <span class="num">from {formatPrice(startingPrice(item.variants_json))}</span>
                         <span class="tags">
                           {#if !item.is_available}<span class="tag">Unavailable</span>{/if}
+                          {#if deals[item.id]?.active}<span class="tag">{deals[item.id].percent_off}% off</span>{/if}
                           {#if low}<span class="tag tag-warn"><TriangleAlert aria-hidden="true" /> Low stock</span>{/if}
                         </span>
                       </span>
                     </button>
+                    {#if isOnlineDealItem(item)}
+                      <button type="button" class="btn btn-sm" aria-label="Edit deal for {item.name}" disabled={dealBusy} onclick={() => editDeal(item)}>Deal</button>
+                    {/if}
                     <button type="button" class="btn btn-icon btn-sm del" aria-label="Remove {item.name}" title="Remove" onclick={() => deleteItem(item)}><Trash2 aria-hidden="true" /></button>
                   </li>
                 {/each}
@@ -177,6 +244,19 @@
 </div>
 
 <ProductEditor bind:open={editorOpen} item={editing} />
+
+<Sheet bind:open={dealOpen} title={dealItem ? `Deal for ${dealItem.name}` : 'Menu deal'} width="440px">
+  <form class="stack" onsubmit={saveDeal}>
+    <p class="muted">The deal reduces the item price before extras. Customers can apply coins to the discounted subtotal.</p>
+    {#if dealError}
+      <p role="alert">{dealError}</p>
+    {:else}
+      <label class="field"><span class="label">Percent off</span><input class="input" type="number" min="1" max="99" step="1" required bind:value={dealPercent} disabled={dealBusy} /></label>
+      <label><input type="checkbox" bind:checked={dealActive} disabled={dealBusy} /> Active on Connect checkout</label>
+    {/if}
+    <button type="submit" class="btn btn-primary" disabled={!validDeal || dealBusy || !!dealError}>Save deal</button>
+  </form>
+</Sheet>
 
 <Sheet bind:open={categoriesOpen} title="Categories" width="480px" onclose={() => (deleting = null)}>
   <form class="add" onsubmit={addCategory}>
