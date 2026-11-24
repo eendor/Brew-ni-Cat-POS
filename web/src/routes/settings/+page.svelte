@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { Plus, Trash2, RefreshCw } from '@lucide/svelte';
   import { supabase } from '$lib/supabase.js';
-  import { db, fetchItems } from '$lib/data.svelte.js';
+  import { db, fetchItems, fetchShop } from '$lib/data.svelte.js';
   import { notify } from '$lib/toast.svelte.js';
   import PageHeader from '$lib/components/PageHeader.svelte';
   import SettingsSection from '$lib/components/SettingsSection.svelte';
@@ -76,6 +76,8 @@
       return;
     }
     if (data?.updated_at) updated[section] = data.updated_at;
+    // The shop switch in the top bar also reads the hours.
+    if (section === 'hours') fetchShop();
     notify('Saved and recorded in the audit log. Live on the website within 60 seconds.');
   }
 

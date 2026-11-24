@@ -1,5 +1,6 @@
 import { supabase } from './supabase.js';
 import { catTreatsLast } from './category-order.js';
+import { SHOP_SECTIONS, parseShopState, closureContent } from './shop-closure.js';
 
 /**
  * Everything the panel shows, loaded once after sign-in and kept current by Supabase
@@ -13,6 +14,8 @@ export const db = $state({
   inventory: [],
   recipes: [],
   expenses: [],
+  // Closed today and the opening hours, for the shop switch in the top bar (null until loaded).
+  shop: null,
   loaded: false,
   refreshing: false,
   live: false,
@@ -45,8 +48,36 @@ export const fetchRecipes = () => load('recipes', supabase.from('recipe_mappings
 export const fetchExpenses = () =>
   load('expenses', supabase.from('expenses').select('*').eq('is_deleted', false).order('timestamp', { ascending: false }));
 
+/** Closed today with the hours, so the switch can also say when the shop is outside its hours. */
+export async function fetchShop() {
+  if (!supabase) return;
+  const { data, error } = await supabase.from('site_content').select('section, content, updated_at').in('section', SHOP_SECTIONS);
+  if (error) {
+    console.error('Could not load the shop status:', error);
+    db.errors.shop = error.message || 'Could not load.';
+    return;
+  }
+  delete db.errors.shop;
+  db.shop = parseShopState(data);
+}
+
+/**
+ * Turns Closed today on (with an optional note for customers) or off. The website and Messenger
+ * pick it up within a minute, and the tablets on their next check. Throws so the caller can show it.
+ */
+export async function saveShopClosure(closed, note = '') {
+  const content = closureContent(closed, note);
+  const { data, error } = await supabase.from('site_content').update({ content }).eq('section', 'closure').select('section, content, updated_at');
+  if (error) throw error;
+  // No row back: this account isn't staff, or the server doesn't have the switch yet.
+  const saved = parseShopState(data);
+  if (!saved) throw new Error("This account can't change Closed today. Sign in with the store account.");
+  db.shop = { ...saved, hours: db.shop?.hours ?? null };
+  return db.shop;
+}
+
 export async function loadAll() {
-  await Promise.all([fetchOrders(), fetchCategories(), fetchItems(), fetchInventory(), fetchRecipes(), fetchExpenses()]);
+  await Promise.all([fetchOrders(), fetchCategories(), fetchItems(), fetchInventory(), fetchRecipes(), fetchExpenses(), fetchShop()]);
   db.loaded = true;
 }
 
@@ -85,7 +116,7 @@ export function stopRealtime() {
 
 export function resetData() {
   stopRealtime();
-  Object.assign(db, { orders: [], categories: [], items: [], inventory: [], recipes: [], expenses: [], loaded: false, errors: {} });
+  Object.assign(db, { orders: [], categories: [], items: [], inventory: [], recipes: [], expenses: [], shop: null, loaded: false, errors: {} });
 }
 
 /** Throws the Supabase error so callers can show it. */
