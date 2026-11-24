@@ -182,17 +182,18 @@ Three rules keep this working:
 
 ## Web dashboard (`web/`)
 
-Next.js 14 App Router against the same Supabase project via `supabase-js`, live-updating through realtime subscriptions on orders, items, inventory, categories and expenses. Styled as an Apple-inspired design system with a light/dark theme toggle (persisted, follows the OS preference on first visit).
+SvelteKit (Svelte 5, plain JavaScript) on Vercel, against the same Supabase project through `supabase-js`. Sales, orders, stock, the menu and expenses update live through realtime subscriptions, in a light or dark theme.
 
-It mirrors the register's owner-facing reporting: an **End of Day report** with a report-day picker (pull up any past day's takings the morning after) showing net revenue and profits, plus the per-item **Food & Drink Totals** with a per day / week / month toggle — both computed from the already-synced orders, no extra tables. Its **Menu Catalog Editor** shares the same 30-icon product icon catalog (`public.items.icon`) as the Android tablet so custom icons selected in either app render consistently everywhere. It also includes an owner-only **Shop Settings** tab that edits `public.site_content` (opening hours, site banner notice, contact details, shop address and map link, accepted payment methods and GCash QR, social links, delivery partners, About & Home copy, and gallery photos) plus the **Take-out Box** fee in `public.items`, with every `site_content` update recorded in `private.site_content_audit`.
+It mirrors the register's owner-facing reporting: the day's sales with a day picker and the Z-Reading, plus the per-item food and drink totals by day, week or month, all worked out from the synced orders with no extra tables. The menu editor shares the 30-icon product catalog (`public.items.icon`) with the tablets. The Website page edits `public.site_content` (hours, banner, contact details, address, payments, social links, delivery partners, the About page and the gallery) and the take-out box fee, and every `site_content` change is recorded in `private.site_content_audit`. The top bar has the shop's **Closed today** switch, the same one as the tablets' top bar. See [`web/README.md`](web/README.md) for the pages.
 
 ```bash
 cd web
 npm install
-npm run dev      # http://localhost:3000
+npm run dev      # http://localhost:5173
+npm test
 ```
 
-Falls back to the shipped project URL and publishable key when `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` are unset, so it runs with no configuration. Set them to point at a different environment.
+It falls back to the shop's project URL and publishable key when `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` are unset, so it runs with no setup. Set them to point at another project.
 
 ---
 

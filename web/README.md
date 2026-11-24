@@ -15,6 +15,8 @@ Built with SvelteKit (Svelte 5, plain JavaScript) as a single-page app, deployed
 | Rewards (`/rewards`) | Check and redeem reward codes, and manage point rewards and game prizes. |
 | Website (`/settings`) | The public website's banner, hours, contact, address, payments, links, riders, about page and gallery. |
 
+The top bar on every page also has the shop's status: **Open**, **Closed today** or **Outside hours**, the same switch the tablets have (Connect FR-111, FR-112). Tap it to close the shop for today with an optional note for customers, or to open it again. Closed today stops online orders on the website and Messenger and ends by itself at midnight, Philippine time; outside the saved hours the shop already shows as closed. The status re-checks every minute, so a switch flipped on a tablet shows up here too.
+
 ## Run it
 
 ```bash
@@ -30,6 +32,6 @@ npm run build
 
 - `src/routes`: one folder per page; `+layout.svelte` has sign-in and the top bar.
 - `src/lib/data.svelte.js`: the shared data (orders, menu, stock, expenses) and the realtime feed.
-- `src/lib/*.js`: logic with tests in `tests/` (reports, rewards, website content, product icons).
+- `src/lib/*.js`: logic with tests in `tests/` (reports, rewards, website content, the shop switch, product icons).
 - `src/lib/components`: shared pieces such as the sheet, the order detail and the item editor.
 - `src/app.css`: the design tokens and shared classes, in light and dark.

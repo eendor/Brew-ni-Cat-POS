@@ -7,6 +7,7 @@
   import { supabase } from '$lib/supabase.js';
   import { db, loadAll, refresh, startRealtime, resetData } from '$lib/data.svelte.js';
   import Toasts from '$lib/components/Toasts.svelte';
+  import ShopSwitch from '$lib/components/ShopSwitch.svelte';
 
   let { children } = $props();
 
@@ -127,6 +128,7 @@
         {/each}
       </nav>
       <div class="tools">
+        <ShopSwitch />
         <span class="live" class:on={db.live} title={db.live ? 'Changes from the tablets appear as they happen.' : 'Not receiving live changes. Refresh to load the latest.'}>
           <span class="dot"></span><span class="live-word">{db.live ? 'Live' : 'Offline'}</span>
         </span>
